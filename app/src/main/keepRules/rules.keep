@@ -1,0 +1,10 @@
+# Reglas R8 de Mis Notas.
+
+# Tink (usado por androidx.security:security-crypto) referencia anotaciones de Error Prone
+# que solo existen en compilación.
+-dontwarn com.google.errorprone.annotations.**
+
+# OkHttp: plataformas TLS opcionales que no existen en Android.
+-dontwarn org.conscrypt.**
+-dontwarn org.bouncycastle.**
+-dontwarn org.openjsse.**

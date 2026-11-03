@@ -1,0 +1,46 @@
+# Cómo contribuir
+
+¡Gracias por tu interés en Mis Notas!
+
+## Incidencias
+
+- **Fallos**: indica la versión de la app y de Android, los pasos para reproducirlo y qué esperabas que pasara. Si es un error de sincronización, incluye el mensaje que aparece en Ajustes (sin contraseñas ni la URL de tu servidor si no quieres compartirla).
+- **Ideas**: describe el problema que resolverían antes de proponer una solución concreta.
+- **Vulnerabilidades**: no las publiques; sigue [SECURITY.md](SECURITY.md).
+
+## Pull requests
+
+1. Haz un *fork* y crea una rama desde `main`.
+2. Mantén los cambios pequeños y centrados en un tema.
+3. Antes de enviar, comprueba que todo pasa:
+   ```bash
+   ./gradlew testDebugUnitTest lintDebug assembleDebug
+   ```
+4. Si cambias la base de datos, sube `version` en `AppDatabase`, añade una `Migration` y versiona el JSON que se genera en `app/schemas/`. Nunca uses migraciones destructivas: se perderían notas.
+5. Si cambias el formato remoto, actualiza [docs/SYNC_FORMAT.md](docs/SYNC_FORMAT.md) y mantén la lectura de los formatos antiguos.
+6. Los cambios en `data/sync` o `security` deben venir con tests.
+
+Al contribuir aceptas que tu código se publique bajo la licencia **GPL v3 o posterior**.
+
+## Estilo
+
+- Kotlin con el estilo oficial (`kotlin.code.style=official`).
+- Textos de la interfaz y comentarios en español.
+- Nada de dependencias propietarias ni servicios de Google Play: la app debe poder publicarse en F-Droid.
+
+## Publicar una versión
+
+1. Actualiza `versionCode` y `versionName` en `app/build.gradle.kts` y añade la entrada en [CHANGELOG.md](CHANGELOG.md).
+2. Crea y sube una etiqueta: `git tag v1.0.0 && git push origin v1.0.0`.
+3. El flujo `release.yml` compila el APK, lo firma y crea un *release* en GitHub con el APK adjunto.
+
+Para que el flujo firme el APK, añade estos *secrets* en **Settings → Secrets and variables → Actions**:
+
+| Secret | Valor |
+|--------|-------|
+| `KEYSTORE_BASE64` | El `.jks` en Base64 (`base64 -i misnotas-release.jks \| pbcopy`) |
+| `KEYSTORE_PASSWORD` | Contraseña del almacén |
+| `KEY_ALIAS` | Alias de la clave (p. ej. `misnotas`) |
+| `KEY_PASSWORD` | Contraseña de la clave |
+
+Sin esos *secrets*, el flujo publica un APK **sin firmar**, que Android no deja instalar.

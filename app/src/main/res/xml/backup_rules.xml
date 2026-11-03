@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 11 y anteriores: no se sube nada a la copia de seguridad en la nube de Google.
+  La base de datos local guarda las notas sin cifrar y las preferencias dependen del Keystore
+  del dispositivo. La copia de seguridad de Mis Notas es tu servidor Nextcloud (cifrada).
+-->
+<full-backup-content>
+    <exclude domain="root" path="." />
+    <exclude domain="file" path="." />
+    <exclude domain="database" path="." />
+    <exclude domain="sharedpref" path="." />
+    <exclude domain="external" path="." />
+</full-backup-content>

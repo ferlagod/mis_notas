@@ -1,0 +1,44 @@
+# --- Gradle / Kotlin ---
+.gradle/
+.kotlin/
+build/
+/captures
+.externalNativeBuild
+.cxx
+
+# --- Configuración local (rutas del SDK, máquina del desarrollador) ---
+local.properties
+
+# --- IDE ---
+.idea/
+*.iml
+.vscode/
+.fleet/
+
+# --- Sistema operativo ---
+.DS_Store
+Thumbs.db
+
+# --- Firma de la app: NUNCA subir claves ni contraseñas ---
+keystore.properties
+*.jks
+*.keystore
+*.p12
+*.pem
+
+# --- Artefactos generados ---
+*.apk
+*.aab
+*.ap_
+*.dex
+/app/release/
+/app/debug/
+output-metadata.json
+
+# --- Logs y temporales ---
+*.log
+*.hprof
+*.tmp
+
+# --- Recursos de diseño originales (la copia del repositorio está en docs/logo.png) ---
+/Mis Notas círculo.png
