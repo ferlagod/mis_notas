@@ -6,6 +6,9 @@ package com.ferlagod.misnotas.ui.viewmodel
 
 import android.app.Application
 import android.net.Uri
+import androidx.annotation.StringRes
+import com.ferlagod.misnotas.R
+import com.ferlagod.misnotas.util.LanguageManager
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -128,6 +131,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val trashNotesCount = trashNotes.map { it.size }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
+    private fun text(@StringRes id: Int): String =
+        LanguageManager.localizedContext(getApplication()).getString(id)
+
     init {
         viewModelScope.launch { syncRepository.migrateLegacyImages() }
         if (_isConfigured.value && _isUnlocked.value) {
@@ -149,12 +155,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         onError: (String) -> Unit
     ) {
         if (serverUrl.isBlank() || username.isBlank() || appPassword.isBlank() || masterPassword.isBlank()) {
-            onError("Todos los campos son obligatorios")
+            onError(text(R.string.err_all_fields))
             return
         }
         val url = serverUrl.trim()
         if (!url.startsWith("https://")) {
-            onError("La URL del servidor debe empezar por https:// (no se permiten conexiones sin cifrar)")
+            onError(text(R.string.err_https_required))
             return
         }
         viewModelScope.launch {
@@ -167,7 +173,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     triggerSync()
                     onSuccess()
                 }
-                .onFailure { onError(it.message ?: "No se pudo conectar") }
+                .onFailure { onError(it.message ?: text(R.string.err_connect_failed)) }
         }
     }
 
@@ -185,7 +191,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 triggerSync()
                 onSuccess()
             } catch (e: Exception) {
-                onError(SyncRepository.friendlyMessage(e))
+                onError(syncRepository.friendlyMessage(e))
             }
         }
     }

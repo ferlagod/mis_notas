@@ -57,4 +57,25 @@ data class KeyInfo(
 }
 
 /** La contraseña maestra no coincide con la de la bóveda. */
-class WrongMasterPasswordException(message: String = "Contraseña maestra incorrecta") : Exception(message)
+class WrongMasterPasswordException(val reason: Reason = Reason.WRONG) : Exception("Wrong master password: $reason") {
+    enum class Reason {
+        /** La contraseña no verifica contra keyinfo.json. */
+        WRONG,
+        /** No descifra las notas v1.0 ya existentes en el servidor. */
+        MISMATCH_EXISTING,
+        /** La bóveda del servidor cambió y la clave local ya no sirve. */
+        CHANGED_ON_SERVER
+    }
+}
+
+/** Estado de la bóveda que impide continuar. */
+class VaultException(val reason: Reason) : Exception("Vault error: $reason") {
+    enum class Reason {
+        /** Hay ficheros v1.0 en el servidor y este dispositivo no tiene el salt original. */
+        LEGACY_NO_SALT,
+        /** No hay parámetros de cifrado guardados en el dispositivo. */
+        NO_LOCAL_DATA,
+        /** Falta keyinfo.json en el servidor. */
+        KEYINFO_MISSING
+    }
+}

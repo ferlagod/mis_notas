@@ -25,8 +25,15 @@ Al contribuir aceptas que tu código se publique bajo la licencia **GPL v3 o pos
 ## Estilo
 
 - Kotlin con el estilo oficial (`kotlin.code.style=official`).
-- Textos de la interfaz y comentarios en español.
+- Comentarios del código en español.
+- Ningún texto visible escrito en el código: todo va en `strings.xml`. Si añades un texto, añádelo en **los cinco** idiomas (`values/` es inglés, más `values-es`, `values-fr`, `values-de` y `values-it`). Lint falla si falta alguna traducción.
 - Nada de dependencias propietarias ni servicios de Google Play: la app debe poder publicarse en F-Droid.
+
+## Traducciones
+
+- Para corregir una traducción, edita el `strings.xml` de ese idioma.
+- Para añadir un idioma nuevo, crea `app/src/main/res/values-<código>/strings.xml` con todas las claves y añade la entrada en `AppLanguage` (`util/LanguageManager.kt`). La lista de idiomas para el sistema se genera sola (`generateLocaleConfig`).
+- Usa `plurals` para textos con números y respeta los marcadores (`%1$s`, `%d`).
 
 ## Publicar una versión
 

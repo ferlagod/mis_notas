@@ -15,6 +15,7 @@ Primera versión pública.
 - Sincronización periódica en segundo plano (WorkManager) y al volver a la app.
 - Markdown: bloques de código, listas numeradas, listas anidadas y enlaces.
 - Estado de la última sincronización y sección "Acerca de" en Ajustes.
+- Interfaz traducida a español, inglés, francés, alemán e italiano, con selector de idioma en Ajustes ("Idioma del sistema" por defecto). En Android 13+ usa el idioma por aplicación del sistema.
 - Licencia GPL v3, README, guía de contribución, política de seguridad y CI.
 
 ### Cambiado
@@ -22,6 +23,7 @@ Primera versión pública.
 - PBKDF2 sube a 600.000 iteraciones en cuentas nuevas.
 - Imágenes de hasta 1600 px (antes 800 px).
 - Las notas ya no se incluyen en la copia de seguridad en la nube de Google.
+- Las fechas se muestran con el formato del idioma activo.
 
 ### Corregido
 - Las ediciones se guardan también con el gesto "atrás" y al salir de la app.

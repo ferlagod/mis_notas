@@ -4,6 +4,8 @@
 
 package com.ferlagod.misnotas.ui.screen
 
+import com.ferlagod.misnotas.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -112,7 +114,7 @@ fun LoginScreen(
             ) {
                 Icon(
                     imageVector = Icons.Rounded.CloudSync,
-                    contentDescription = "MisNotas",
+                    contentDescription = stringResource(R.string.app_name),
                     tint = Color.White,
                     modifier = Modifier.size(44.dp)
                 )
@@ -121,7 +123,7 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = "MisNotas",
+                text = stringResource(R.string.app_name),
                 style = MaterialTheme.typography.headlineMedium.copy(
                     fontWeight = FontWeight.Bold,
                     letterSpacing = (-0.5).sp
@@ -131,9 +133,9 @@ fun LoginScreen(
 
             Text(
                 text = if (isConfigured && !isReconfiguring) {
-                    "Introduce tu contraseña maestra para descifrar"
+                    stringResource(R.string.login_subtitle_unlock)
                 } else {
-                    "Sincronización segura con Nextcloud y cifrado E2EE"
+                    stringResource(R.string.login_subtitle_setup)
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -156,7 +158,7 @@ fun LoginScreen(
                     AnimatedVisibility(visible = !isConfigured || isReconfiguring) {
                         Column {
                             Text(
-                                text = "SERVIDOR WEBDAV / NEXTCLOUD",
+                                text = stringResource(R.string.section_server),
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontWeight = FontWeight.SemiBold
                                 ),
@@ -168,7 +170,7 @@ fun LoginScreen(
                             StyledTextField(
                                 value = serverUrl,
                                 onValueChange = { serverUrl = it; errorMessage = null },
-                                placeholder = "https://nube.tu-servidor.com",
+                                placeholder = stringResource(R.string.server_hint),
                                 leadingIcon = Icons.Rounded.Storage,
                                 keyboardOptions = KeyboardOptions(
                                     keyboardType = KeyboardType.Uri,
@@ -181,7 +183,7 @@ fun LoginScreen(
                             StyledTextField(
                                 value = username,
                                 onValueChange = { username = it; errorMessage = null },
-                                placeholder = "Usuario de Nextcloud",
+                                placeholder = stringResource(R.string.username_hint),
                                 leadingIcon = Icons.Rounded.Person,
                                 keyboardOptions = KeyboardOptions(
                                     keyboardType = KeyboardType.Text,
@@ -194,7 +196,7 @@ fun LoginScreen(
                             StyledTextField(
                                 value = appPassword,
                                 onValueChange = { appPassword = it; errorMessage = null },
-                                placeholder = "Contraseña de aplicación",
+                                placeholder = stringResource(R.string.app_password_hint),
                                 leadingIcon = Icons.Rounded.Key,
                                 isPassword = true,
                                 passwordVisible = passwordVisible,
@@ -210,7 +212,7 @@ fun LoginScreen(
                     }
 
                     Text(
-                        text = "CIFRADO E2EE",
+                        text = stringResource(R.string.section_e2ee_short),
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontWeight = FontWeight.SemiBold
                         ),
@@ -222,7 +224,7 @@ fun LoginScreen(
                     StyledTextField(
                         value = masterPassword,
                         onValueChange = { masterPassword = it; errorMessage = null },
-                        placeholder = "Contraseña Maestra (AES-256)",
+                        placeholder = stringResource(R.string.master_password_hint),
                         leadingIcon = Icons.Rounded.Lock,
                         isPassword = true,
                         passwordVisible = masterPasswordVisible,
@@ -291,7 +293,7 @@ fun LoginScreen(
                             )
                         } else {
                             Text(
-                                text = if (!isConfigured || isReconfiguring) "Conectar y Desbloquear" else "Desbloquear Notas",
+                                text = if (!isConfigured || isReconfiguring) stringResource(R.string.connect_and_unlock) else stringResource(R.string.unlock_notes),
                                 style = MaterialTheme.typography.titleMedium.copy(
                                     fontWeight = FontWeight.SemiBold
                                 )
@@ -311,7 +313,7 @@ fun LoginScreen(
                 ) {
                     TextButton(onClick = onSkip) {
                         Text(
-                            text = "Continuar sin Nextcloud (Modo local)",
+                            text = stringResource(R.string.continue_local),
                             color = primaryBlue,
                             style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
                         )
@@ -324,7 +326,7 @@ fun LoginScreen(
                 ) {
                     TextButton(onClick = onResetConfig) {
                         Text(
-                            text = "Restablecer / Desconectar cuenta",
+                            text = stringResource(R.string.reset_account),
                             color = MaterialTheme.colorScheme.error,
                             style = MaterialTheme.typography.bodySmall
                         )
@@ -370,7 +372,7 @@ private fun StyledTextField(
                 IconButton(onClick = onTogglePassword) {
                     Icon(
                         imageVector = if (passwordVisible) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
-                        contentDescription = "Alternar contraseña",
+                        contentDescription = stringResource(R.string.cd_toggle_password),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(20.dp)
                     )

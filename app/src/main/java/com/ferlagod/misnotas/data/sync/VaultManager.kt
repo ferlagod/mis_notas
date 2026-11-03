@@ -45,10 +45,7 @@ class VaultManager(private val prefs: AuthPreferences) {
         val salt: ByteArray
         val iterations: Int
         if (legacyFiles.isNotEmpty()) {
-            salt = prefs.getSalt() ?: throw IllegalStateException(
-                "Hay notas de una versión anterior en el servidor. Actualiza primero la app en el " +
-                    "dispositivo donde las creaste y sincroniza desde allí."
-            )
+            salt = prefs.getSalt() ?: throw VaultException(VaultException.Reason.LEGACY_NO_SALT)
             iterations = CryptoManager.LEGACY_PBKDF2_ITERATIONS
         } else {
             salt = CryptoManager.generateSalt()
@@ -70,7 +67,7 @@ class VaultManager(private val prefs: AuthPreferences) {
             } catch (_: Exception) {
                 false
             }
-            if (!ok) throw WrongMasterPasswordException("La contraseña no coincide con las notas existentes en el servidor")
+            if (!ok) throw WrongMasterPasswordException(WrongMasterPasswordException.Reason.MISMATCH_EXISTING)
         }
 
         val info = KeyInfo.create(salt, iterations, key)
@@ -89,7 +86,7 @@ class VaultManager(private val prefs: AuthPreferences) {
      */
     suspend fun unlockLocal(masterPassword: String): SecretKey {
         val salt = prefs.getSalt()
-            ?: throw IllegalStateException("No hay datos de cifrado en este dispositivo. Vuelve a conectar la cuenta.")
+            ?: throw VaultException(VaultException.Reason.NO_LOCAL_DATA)
         val key = derive(masterPassword, salt, prefs.getIterations())
         val check = prefs.getKeyCheck()
         if (check != null && !CryptoManager.verify(check, KeyInfo.CHECK_PLAINTEXT, key, KeyInfo.CHECK_AAD)) {
@@ -103,14 +100,10 @@ class VaultManager(private val prefs: AuthPreferences) {
      */
     suspend fun verifyRemoteKey(client: WebDavClient, key: SecretKey) {
         val raw = client.downloadOrNull(KeyInfo.FILE_NAME)
-            ?: throw IllegalStateException(
-                "No se encuentra ${KeyInfo.FILE_NAME} en el servidor. Vuelve a conectar la cuenta en Ajustes."
-            )
+            ?: throw VaultException(VaultException.Reason.KEYINFO_MISSING)
         val info = KeyInfo.parse(String(raw, Charsets.UTF_8))
         if (!info.verify(key)) {
-            throw WrongMasterPasswordException(
-                "La contraseña maestra del servidor no coincide con la de este dispositivo. Desbloquea de nuevo."
-            )
+            throw WrongMasterPasswordException(WrongMasterPasswordException.Reason.CHANGED_ON_SERVER)
         }
         if (prefs.getKeyCheck() == null) prefs.saveVaultParams(info.salt, info.iterations, info.check)
     }

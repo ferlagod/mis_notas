@@ -59,9 +59,19 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+    androidResources {
+        // Declara los idiomas al sistema (Ajustes → Apps → Mis Notas → Idioma en Android 13+).
+        generateLocaleConfig = true
+    }
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+    bundle {
+        // El idioma se elige dentro de la app: el AAB debe incluir todas las traducciones.
+        language {
+            enableSplit = false
+        }
     }
     dependenciesInfo {
         // Sin bloque de dependencias cifrado por Google (requisito para F-Droid / builds reproducibles).

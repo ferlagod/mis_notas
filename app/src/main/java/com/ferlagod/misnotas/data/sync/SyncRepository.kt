@@ -5,6 +5,9 @@
 package com.ferlagod.misnotas.data.sync
 
 import android.content.Context
+import androidx.annotation.StringRes
+import com.ferlagod.misnotas.R
+import com.ferlagod.misnotas.util.LanguageManager
 import android.util.Base64
 import android.util.Log
 import androidx.room.withTransaction
@@ -35,9 +38,15 @@ import java.util.UUID
 import javax.crypto.SecretKey
 import javax.net.ssl.SSLException
 
+enum class SyncStage(@StringRes val labelRes: Int) {
+    CONNECTING(R.string.sync_stage_connecting),
+    DOWNLOADING(R.string.sync_stage_downloading),
+    UPLOADING(R.string.sync_stage_uploading)
+}
+
 sealed interface SyncState {
     data object Idle : SyncState
-    data class Syncing(val message: String = "Sincronizando con Nextcloud...") : SyncState
+    data class Syncing(val stage: SyncStage = SyncStage.CONNECTING) : SyncState
     data class Success(val timestamp: Long = System.currentTimeMillis(), val warnings: Int = 0) : SyncState
     data class Error(val message: String, val cause: Throwable? = null) : SyncState
 }
@@ -97,16 +106,38 @@ class SyncRepository private constructor(context: Context) {
         private fun folderFile(id: String) = "$FOLDER_PREFIX$id$JSON_EXT"
         private fun attachmentFile(id: String) = "$ATTACHMENT_PREFIX$id$BIN_EXT"
 
-        /** Traduce excepciones técnicas a mensajes comprensibles. */
-        fun friendlyMessage(e: Throwable): String = when (e) {
-            is WrongMasterPasswordException -> e.message ?: "Contraseña maestra incorrecta"
-            is WebDavAuthException -> "Usuario o contraseña de aplicación incorrectos"
-            is UnknownHostException -> "No se encuentra el servidor. Revisa la URL o tu conexión."
-            is SocketTimeoutException -> "El servidor tardó demasiado en responder"
-            is SSLException -> "Error de certificado SSL/TLS del servidor"
-            is WebDavException -> e.message ?: "Error del servidor (${e.code})"
-            is java.io.IOException -> "Error de red: ${e.localizedMessage ?: "sin conexión"}"
-            else -> e.localizedMessage ?: "Error desconocido durante la sincronización"
+    }
+
+    /** Traduce excepciones técnicas a mensajes comprensibles en el idioma de la app. */
+    fun friendlyMessage(e: Throwable): String {
+        val res = LanguageManager.localizedContext(appContext)
+        return when (e) {
+            is WrongMasterPasswordException -> res.getString(
+                when (e.reason) {
+                    WrongMasterPasswordException.Reason.WRONG -> R.string.err_wrong_master
+                    WrongMasterPasswordException.Reason.MISMATCH_EXISTING -> R.string.err_master_mismatch_existing
+                    WrongMasterPasswordException.Reason.CHANGED_ON_SERVER -> R.string.err_master_changed
+                }
+            )
+            is VaultException -> res.getString(
+                when (e.reason) {
+                    VaultException.Reason.LEGACY_NO_SALT -> R.string.err_legacy_no_salt
+                    VaultException.Reason.NO_LOCAL_DATA -> R.string.err_no_local_vault
+                    VaultException.Reason.KEYINFO_MISSING -> R.string.err_keyinfo_missing
+                }
+            )
+            is WebDavAuthException -> res.getString(R.string.err_auth)
+            is UnknownHostException -> res.getString(R.string.err_unknown_host)
+            is SocketTimeoutException -> res.getString(R.string.err_timeout)
+            is SSLException -> res.getString(R.string.err_ssl)
+            is WebDavException ->
+                if (e.reason == WebDavException.Reason.PATH_NOT_FOUND) res.getString(R.string.err_path_not_found)
+                else res.getString(R.string.err_server, e.code)
+            is java.io.IOException -> res.getString(
+                R.string.err_network,
+                e.localizedMessage ?: res.getString(R.string.err_no_connection)
+            )
+            else -> e.localizedMessage ?: res.getString(R.string.err_unknown)
         }
     }
 
@@ -193,19 +224,19 @@ class SyncRepository private constructor(context: Context) {
     }
 
     private suspend fun runRound(client: WebDavClient, key: SecretKey) {
-        _syncState.value = SyncState.Syncing("Conectando con Nextcloud...")
+        _syncState.value = SyncState.Syncing(SyncStage.CONNECTING)
         client.ensureRootFolder()
         vault.verifyRemoteKey(client, key)
 
         val remote = client.listRemoteFiles().associateBy { it.name }
 
-        _syncState.value = SyncState.Syncing("Descargando cambios...")
+        _syncState.value = SyncState.Syncing(SyncStage.DOWNLOADING)
         pullFolders(client, key, remote)
         pullNotes(client, key, remote)
         migrateLegacyImages()
         downloadMissingAttachments(client, key, remote)
 
-        _syncState.value = SyncState.Syncing("Subiendo cambios...")
+        _syncState.value = SyncState.Syncing(SyncStage.UPLOADING)
         pushFolders(client, key, remote)
         pushAttachments(client, key)
         pushNotes(client, key, remote)
@@ -260,6 +291,9 @@ class SyncRepository private constructor(context: Context) {
 
     private suspend fun pullNotes(client: WebDavClient, key: SecretKey, remote: Map<String, RemoteFileMeta>) {
         val remoteNotes = idsWithPrefix(remote, NOTE_PREFIX, JSON_EXT)
+        val res = LanguageManager.localizedContext(appContext)
+        val conflictSuffix = res.getString(R.string.conflict_suffix)
+        val untitled = res.getString(R.string.untitled)
         val knownTombstones = tombstoneDao.getAll().associate { it.fileName to it.etag }
 
         for ((id, meta) in remoteNotes) {
@@ -274,7 +308,7 @@ class SyncRepository private constructor(context: Context) {
 
             database.withTransaction {
                 val current = noteDao.getNoteById(id)
-                when (val action = SyncMerger.resolveNote(current, record, meta.etag) { UUID.randomUUID().toString() }) {
+                when (val action = SyncMerger.resolveNote(current, record, meta.etag, { UUID.randomUUID().toString() }, conflictSuffix, untitled)) {
                     is MergeAction.SaveRemote -> noteDao.upsertNote(action.entity)
                     is MergeAction.KeepLocal -> noteDao.setRemoteEtag(id, action.etag)
                     is MergeAction.Conflict -> {

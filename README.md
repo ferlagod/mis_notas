@@ -29,6 +29,7 @@ Mis Notas combina el aspecto limpio de Apple Notas y Google Keep con la organiza
 - **Cifrado de extremo a extremo** AES-256-GCM con una contraseña maestra que nunca sale del dispositivo.
 - **Sin conflictos silenciosos**: si una nota se edita a la vez en dos dispositivos, se conservan ambas versiones.
 - Tema claro y oscuro (negro puro en OLED).
+- **Disponible en español, inglés, francés, alemán e italiano**: se elige en Ajustes (o "Idioma del sistema"). En Android 13+ también desde los ajustes de idioma del sistema.
 - Sin anuncios, sin rastreadores, sin servicios de Google.
 
 ## Instalación
@@ -108,7 +109,9 @@ app/src/main/java/com/ferlagod/misnotas/
 │   └── sync/         Bóveda, formato remoto, reglas de fusión, sincronización y WorkManager
 ├── security/         Cifrado (PBKDF2 + AES-GCM)
 ├── ui/               Pantallas Jetpack Compose, tema y lector Markdown
-└── util/             Compresión de imágenes
+└── util/             Compresión de imágenes e idioma de la app
+
+app/src/main/res/values*/strings.xml   Textos (inglés por defecto; es, fr, de, it)
 ```
 
 ## Limitaciones conocidas

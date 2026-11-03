@@ -4,6 +4,10 @@
 
 package com.ferlagod.misnotas.ui.screen
 
+import android.text.format.DateFormat
+import androidx.compose.ui.res.pluralStringResource
+import com.ferlagod.misnotas.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -116,9 +120,9 @@ fun NotesScreen(
     var showEmptyTrashConfirm by remember { mutableStateOf(false) }
 
     val filterTitle = when (currentFilter) {
-        is NotesFilter.All -> "Todas las notas"
-        is NotesFilter.Pinned -> "Fijadas"
-        is NotesFilter.Trash -> "Papelera"
+        is NotesFilter.All -> stringResource(R.string.all_notes)
+        is NotesFilter.Pinned -> stringResource(R.string.pinned)
+        is NotesFilter.Trash -> stringResource(R.string.trash)
         is NotesFilter.Folder -> currentFilter.folderName
     }
 
@@ -141,7 +145,7 @@ fun NotesScreen(
                     IconButton(onClick = onBackToFolders) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = "Volver a carpetas",
+                            contentDescription = stringResource(R.string.cd_back_to_folders),
                             tint = primaryBlue
                         )
                     }
@@ -162,7 +166,7 @@ fun NotesScreen(
                     IconButton(onClick = onToggleLayout) {
                         Icon(
                             imageVector = if (isGridLayout) Icons.Rounded.ViewAgenda else Icons.Rounded.GridView,
-                            contentDescription = "Cambiar vista",
+                            contentDescription = stringResource(R.string.cd_toggle_layout),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -187,7 +191,7 @@ fun NotesScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.Search,
-                            contentDescription = "Buscar",
+                            contentDescription = stringResource(R.string.cd_search),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(20.dp)
                         )
@@ -206,7 +210,7 @@ fun NotesScreen(
                             decorationBox = { innerTextField ->
                                 if (searchQuery.isEmpty()) {
                                     Text(
-                                        text = if (isTrashView) "Buscar en papelera..." else "Busca en tus notas...",
+                                        text = if (isTrashView) stringResource(R.string.search_trash_hint) else stringResource(R.string.search_notes_hint),
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                                     )
@@ -222,7 +226,7 @@ fun NotesScreen(
                             ) {
                                 Icon(
                                     imageVector = Icons.Rounded.Clear,
-                                    contentDescription = "Limpiar búsqueda",
+                                    contentDescription = stringResource(R.string.cd_clear_search),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(16.dp)
                                 )
@@ -247,7 +251,7 @@ fun NotesScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "${notes.size} nota(s) en papelera",
+                                text = pluralStringResource(R.plurals.trash_count, notes.size, notes.size),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
@@ -263,7 +267,7 @@ fun NotesScreen(
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
-                                        text = "Vaciar",
+                                        text = stringResource(R.string.empty_action),
                                         fontWeight = FontWeight.Bold,
                                         style = MaterialTheme.typography.labelMedium
                                     )
@@ -284,7 +288,7 @@ fun NotesScreen(
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.Add,
-                        contentDescription = "Nueva nota",
+                        contentDescription = stringResource(R.string.cd_new_note),
                         modifier = Modifier.size(28.dp)
                     )
                 }
@@ -302,9 +306,9 @@ fun NotesScreen(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         text = when {
-                            searchQuery.isNotBlank() -> "Sin resultados para \"$searchQuery\""
-                            isTrashView -> "La papelera está vacía"
-                            else -> "No hay notas en esta sección"
+                            searchQuery.isNotBlank() -> stringResource(R.string.no_results, searchQuery)
+                            isTrashView -> stringResource(R.string.trash_empty)
+                            else -> stringResource(R.string.no_notes)
                         },
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -325,7 +329,7 @@ fun NotesScreen(
                 ) {
                     if (!isTrashView && pinnedNotes.isNotEmpty()) {
                         item(span = androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan.FullLine) {
-                            SectionHeader(title = "FIJADAS")
+                            SectionHeader(title = stringResource(R.string.section_pinned))
                         }
                         items(pinnedNotes, key = { it.id }) { note ->
                             NoteCard(
@@ -346,7 +350,7 @@ fun NotesScreen(
                     if (notesToShow.isNotEmpty()) {
                         if (!isTrashView && pinnedNotes.isNotEmpty()) {
                             item(span = androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan.FullLine) {
-                                SectionHeader(title = "OTRAS")
+                                SectionHeader(title = stringResource(R.string.section_others))
                             }
                         }
                         items(notesToShow, key = { it.id }) { note ->
@@ -374,7 +378,7 @@ fun NotesScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     if (!isTrashView && pinnedNotes.isNotEmpty()) {
-                        item { SectionHeader(title = "FIJADAS") }
+                        item { SectionHeader(title = stringResource(R.string.section_pinned)) }
                         items(pinnedNotes, key = { it.id }) { note ->
                             NoteCard(
                                 note = note,
@@ -393,7 +397,7 @@ fun NotesScreen(
                     val notesToShow = if (isTrashView) notes else otherNotes
                     if (notesToShow.isNotEmpty()) {
                         if (!isTrashView && pinnedNotes.isNotEmpty()) {
-                            item { SectionHeader(title = "OTRAS") }
+                            item { SectionHeader(title = stringResource(R.string.section_others)) }
                         }
                         items(notesToShow, key = { it.id }) { note ->
                             NoteCard(
@@ -417,8 +421,8 @@ fun NotesScreen(
     if (showEmptyTrashConfirm) {
         AlertDialog(
             onDismissRequest = { showEmptyTrashConfirm = false },
-            title = { Text("¿Vaciar papelera?", fontWeight = FontWeight.Bold) },
-            text = { Text("Todas las notas de la papelera se eliminarán permanentemente. Esta acción no se puede deshacer.") },
+            title = { Text(stringResource(R.string.empty_trash_title), fontWeight = FontWeight.Bold) },
+            text = { Text(stringResource(R.string.empty_trash_message)) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -428,12 +432,12 @@ fun NotesScreen(
                     colors = ButtonDefaults.buttonColors(containerColor = AccentRed),
                     shape = RoundedCornerShape(10.dp)
                 ) {
-                    Text("Vaciar papelera", color = Color.White)
+                    Text(stringResource(R.string.empty_trash), color = Color.White)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showEmptyTrashConfirm = false }) {
-                    Text("Cancelar")
+                    Text(stringResource(R.string.cancel))
                 }
             }
         )
@@ -472,7 +476,8 @@ fun NoteCard(
     var showCardMenu by remember { mutableStateOf(false) }
 
     val formattedDate = remember(note.updatedAt) {
-        val formatter = SimpleDateFormat("d MMM", Locale.forLanguageTag("es-ES"))
+        val locale = Locale.getDefault()
+        val formatter = SimpleDateFormat(DateFormat.getBestDateTimePattern(locale, "dMMM"), locale)
         formatter.format(Date(note.updatedAt))
     }
 
@@ -517,7 +522,7 @@ fun NoteCard(
                         ) {
                             Icon(
                                 imageVector = Icons.Rounded.PushPin,
-                                contentDescription = "Fijar",
+                                contentDescription = stringResource(R.string.pin),
                                 tint = if (note.isPinned) AccentOrange else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
                                 modifier = Modifier.size(16.dp)
                             )
@@ -530,7 +535,7 @@ fun NoteCard(
                             ) {
                                 Icon(
                                     imageVector = Icons.Rounded.MoreVert,
-                                    contentDescription = "Más",
+                                    contentDescription = stringResource(R.string.cd_more),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                                     modifier = Modifier.size(16.dp)
                                 )
@@ -541,7 +546,7 @@ fun NoteCard(
                                 onDismissRequest = { showCardMenu = false }
                             ) {
                                 DropdownMenuItem(
-                                    text = { Text(if (note.isPinned) "Desfijar" else "Fijar") },
+                                    text = { Text(if (note.isPinned) stringResource(R.string.unpin) else stringResource(R.string.pin)) },
                                     leadingIcon = { Icon(Icons.Rounded.PushPin, contentDescription = null, modifier = Modifier.size(18.dp)) },
                                     onClick = {
                                         showCardMenu = false
@@ -549,7 +554,7 @@ fun NoteCard(
                                     }
                                 )
                                 DropdownMenuItem(
-                                    text = { Text("Eliminar nota", color = MaterialTheme.colorScheme.error) },
+                                    text = { Text(stringResource(R.string.delete_note), color = MaterialTheme.colorScheme.error) },
                                     leadingIcon = { Icon(Icons.Rounded.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp)) },
                                     onClick = {
                                         showCardMenu = false
@@ -659,7 +664,7 @@ fun NoteCard(
                             modifier = Modifier.size(14.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Restaurar", style = MaterialTheme.typography.labelSmall)
+                        Text(stringResource(R.string.restore), style = MaterialTheme.typography.labelSmall)
                     }
 
                     Spacer(modifier = Modifier.width(8.dp))
@@ -677,7 +682,7 @@ fun NoteCard(
                             modifier = Modifier.size(14.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Eliminar", style = MaterialTheme.typography.labelSmall)
+                        Text(stringResource(R.string.delete), style = MaterialTheme.typography.labelSmall)
                     }
                 }
             }

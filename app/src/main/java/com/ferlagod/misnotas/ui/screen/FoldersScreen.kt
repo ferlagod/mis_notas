@@ -4,6 +4,9 @@
 
 package com.ferlagod.misnotas.ui.screen
 
+import com.ferlagod.misnotas.R
+import com.ferlagod.misnotas.util.AppLanguage
+import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -108,7 +111,9 @@ fun FoldersScreen(
     onConfigureNextcloud: (serverUrl: String, user: String, appPass: String, masterPass: String, onSuccess: () -> Unit, onError: (String) -> Unit) -> Unit,
     onDisconnectNextcloud: () -> Unit,
     getCredentials: () -> NextcloudCredentials?,
-    getLastSync: () -> Long? = { null }
+    getLastSync: () -> Long? = { null },
+    currentLanguage: AppLanguage = AppLanguage.SYSTEM,
+    onLanguageSelected: (AppLanguage) -> Unit = {}
 ) {
     val isDark = isSystemInDarkTheme()
     val primaryBlue = if (isDark) RoyalBlueDark else RoyalBlueLight
@@ -124,7 +129,7 @@ fun FoldersScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = "Carpetas",
+                        text = stringResource(R.string.folders_title),
                         style = MaterialTheme.typography.headlineMedium.copy(
                             fontWeight = FontWeight.Bold,
                             letterSpacing = (-0.5).sp
@@ -150,7 +155,7 @@ fun FoldersScreen(
                     IconButton(onClick = { showSettingsDialog = true }) {
                         Icon(
                             imageVector = Icons.Rounded.Settings,
-                            contentDescription = "Ajustes",
+                            contentDescription = stringResource(R.string.cd_settings),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -160,7 +165,7 @@ fun FoldersScreen(
                         IconButton(onClick = onLockApp) {
                             Icon(
                                 imageVector = Icons.Rounded.Lock,
-                                contentDescription = "Bloquear",
+                                contentDescription = stringResource(R.string.cd_lock),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -198,7 +203,7 @@ fun FoldersScreen(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "Nueva carpeta",
+                            text = stringResource(R.string.new_folder),
                             color = primaryBlue,
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.SemiBold
@@ -219,7 +224,7 @@ fun FoldersScreen(
         ) {
             // ACCESOS RÁPIDOS SUPERIORES (Estilo Inset Grouped List de Apple Notes)
             Text(
-                text = "VISTAS RÁPIDAS",
+                text = stringResource(R.string.quick_views),
                 style = MaterialTheme.typography.labelMedium.copy(
                     fontWeight = FontWeight.SemiBold
                 ),
@@ -234,7 +239,7 @@ fun FoldersScreen(
             ) {
                 Column {
                     QuickAccessRow(
-                        title = "Todas las notas",
+                        title = stringResource(R.string.all_notes),
                         icon = Icons.AutoMirrored.Rounded.Note,
                         iconTint = primaryBlue,
                         count = totalNotesCount,
@@ -248,7 +253,7 @@ fun FoldersScreen(
                     )
 
                     QuickAccessRow(
-                        title = "Fijadas",
+                        title = stringResource(R.string.pinned),
                         icon = Icons.Rounded.PushPin,
                         iconTint = AccentOrange,
                         count = pinnedNotesCount,
@@ -262,7 +267,7 @@ fun FoldersScreen(
                     )
 
                     QuickAccessRow(
-                        title = "Papelera",
+                        title = stringResource(R.string.trash),
                         icon = Icons.Rounded.Delete,
                         iconTint = AccentRed,
                         count = trashNotesCount,
@@ -275,7 +280,7 @@ fun FoldersScreen(
 
             // LISTA DE CARPETAS JERÁRQUICAS (Joplin / Notesnook organization)
             Text(
-                text = "MIS CARPETAS",
+                text = stringResource(R.string.my_folders),
                 style = MaterialTheme.typography.labelMedium.copy(
                     fontWeight = FontWeight.SemiBold
                 ),
@@ -296,7 +301,7 @@ fun FoldersScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "No hay carpetas. Pulsa '+ Nueva carpeta' para organizar tus notas.",
+                            text = stringResource(R.string.no_folders),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -372,7 +377,7 @@ fun FoldersScreen(
     // DIÁLOGO PARA CREAR CARPETA / SUBCARPETA
     if (showCreateFolderDialog) {
         FolderDialog(
-            title = if (parentForNewFolder != null) "Nueva subcarpeta" else "Nueva carpeta",
+            title = if (parentForNewFolder != null) stringResource(R.string.new_subfolder) else stringResource(R.string.new_folder),
             initialName = "",
             initialColor = NoteColor.DEFAULT,
             initialParentId = parentForNewFolder,
@@ -388,7 +393,7 @@ fun FoldersScreen(
     // DIÁLOGO PARA EDITAR CARPETA
     folderToEdit?.let { folder ->
         FolderDialog(
-            title = "Editar carpeta",
+            title = stringResource(R.string.edit_folder),
             initialName = folder.name,
             initialColor = NoteColor.fromKey(folder.color),
             initialParentId = folder.parentId,
@@ -424,7 +429,9 @@ fun FoldersScreen(
             onSaveNextcloud = onConfigureNextcloud,
             onDisconnectNextcloud = onDisconnectNextcloud,
             onTriggerSync = onTriggerSync,
-            lastSync = getLastSync()
+            lastSync = getLastSync(),
+            currentLanguage = currentLanguage,
+            onLanguageSelected = onLanguageSelected
         )
     }
 }
@@ -539,7 +546,7 @@ private fun FolderRow(
             ) {
                 Icon(
                     imageVector = Icons.Rounded.MoreVert,
-                    contentDescription = "Opciones",
+                    contentDescription = stringResource(R.string.cd_options),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(18.dp)
                 )
@@ -550,7 +557,7 @@ private fun FolderRow(
                 onDismissRequest = { showMenu = false }
             ) {
                 DropdownMenuItem(
-                    text = { Text("Nueva subcarpeta") },
+                    text = { Text(stringResource(R.string.new_subfolder)) },
                     leadingIcon = {
                         Icon(Icons.Rounded.CreateNewFolder, contentDescription = null, modifier = Modifier.size(18.dp))
                     },
@@ -560,7 +567,7 @@ private fun FolderRow(
                     }
                 )
                 DropdownMenuItem(
-                    text = { Text("Editar carpeta") },
+                    text = { Text(stringResource(R.string.edit_folder)) },
                     leadingIcon = {
                         Icon(Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
                     },
@@ -570,7 +577,7 @@ private fun FolderRow(
                     }
                 )
                 DropdownMenuItem(
-                    text = { Text("Eliminar carpeta", color = MaterialTheme.colorScheme.error) },
+                    text = { Text(stringResource(R.string.delete_folder), color = MaterialTheme.colorScheme.error) },
                     leadingIcon = {
                         Icon(Icons.Rounded.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
                     },
@@ -602,13 +609,13 @@ private fun SyncStatusIconButton(
     )
 
     val (icon, tint, isRotating, tooltip) = if (!isConfigured) {
-        SyncIconData(Icons.Rounded.CloudOff, MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), false, "Configurar Nextcloud")
+        SyncIconData(Icons.Rounded.CloudOff, MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), false, stringResource(R.string.sync_configure))
     } else {
         when (syncState) {
-            is SyncState.Idle -> SyncIconData(Icons.Rounded.Sync, MaterialTheme.colorScheme.onSurfaceVariant, false, "Sincronizar")
-            is SyncState.Syncing -> SyncIconData(Icons.Rounded.Sync, AccentOrange, true, "Sincronizando...")
-            is SyncState.Success -> SyncIconData(Icons.Rounded.CheckCircle, AccentGreen, false, "Sincronizado")
-            is SyncState.Error -> SyncIconData(Icons.Rounded.ErrorOutline, AccentRed, false, "Error de sincronización")
+            is SyncState.Idle -> SyncIconData(Icons.Rounded.Sync, MaterialTheme.colorScheme.onSurfaceVariant, false, stringResource(R.string.sync_now))
+            is SyncState.Syncing -> SyncIconData(Icons.Rounded.Sync, AccentOrange, true, stringResource(R.string.sync_in_progress))
+            is SyncState.Success -> SyncIconData(Icons.Rounded.CheckCircle, AccentGreen, false, stringResource(R.string.sync_done))
+            is SyncState.Error -> SyncIconData(Icons.Rounded.ErrorOutline, AccentRed, false, stringResource(R.string.sync_error))
         }
     }
 
@@ -664,7 +671,7 @@ private fun FolderDialog(
                 OutlinedTextField(
                     value = folderName,
                     onValueChange = { folderName = it },
-                    placeholder = { Text("Nombre de la carpeta (ej. Trabajo, Ideas, Personal)") },
+                    placeholder = { Text(stringResource(R.string.folder_name_hint)) },
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
@@ -679,7 +686,7 @@ private fun FolderDialog(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
-                    text = "Color distintivo",
+                    text = stringResource(R.string.folder_color),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -719,7 +726,7 @@ private fun FolderDialog(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Text(
-                        text = "Carpeta contenedora (Opcional)",
+                        text = stringResource(R.string.parent_folder),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -741,7 +748,7 @@ private fun FolderDialog(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "📁 Ninguna (Carpeta principal)",
+                                    text = stringResource(R.string.parent_none),
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = if (selectedParentId == null) FontWeight.Bold else FontWeight.Normal,
                                     color = if (selectedParentId == null) (if (isDark) RoyalBlueDark else RoyalBlueLight) else MaterialTheme.colorScheme.onSurface
@@ -779,7 +786,7 @@ private fun FolderDialog(
                 enabled = folderName.isNotBlank()
             ) {
                 Text(
-                    text = "Guardar",
+                    text = stringResource(R.string.save),
                     fontWeight = FontWeight.Bold,
                     color = if (isDark) RoyalBlueDark else RoyalBlueLight
                 )
@@ -788,7 +795,7 @@ private fun FolderDialog(
         dismissButton = {
             TextButton(onClick = onDismiss) {
                 Text(
-                    text = "Cancelar",
+                    text = stringResource(R.string.cancel),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -808,14 +815,14 @@ private fun DeleteFolderConfirmDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                text = "¿Eliminar carpeta?",
+                text = stringResource(R.string.delete_folder_title),
                 style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                 color = MaterialTheme.colorScheme.onSurface
             )
         },
         text = {
             Text(
-                text = "Se eliminará la carpeta \"$folderName\". Las notas que contiene no se borrarán y permanecerán en \"Todas las notas\".",
+                text = stringResource(R.string.delete_folder_message, folderName),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -826,12 +833,12 @@ private fun DeleteFolderConfirmDialog(
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                 shape = RoundedCornerShape(10.dp)
             ) {
-                Text("Eliminar", color = Color.White)
+                Text(stringResource(R.string.delete), color = Color.White)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancelar", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.cancel), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         },
         containerColor = MaterialTheme.colorScheme.surface,

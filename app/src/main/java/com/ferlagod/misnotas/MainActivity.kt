@@ -4,7 +4,10 @@
 
 package com.ferlagod.misnotas
 
+import android.content.Context
 import android.os.Bundle
+import com.ferlagod.misnotas.util.AppLanguage
+import com.ferlagod.misnotas.util.LanguageManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -49,6 +52,11 @@ class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels { MainViewModelFactory(application) }
 
+    override fun attachBaseContext(newBase: Context) {
+        // Android 8-12: aplica el idioma elegido en Ajustes (en 13+ lo hace el sistema).
+        super.attachBaseContext(LanguageManager.wrap(newBase))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -56,7 +64,11 @@ class MainActivity : ComponentActivity() {
         setContent {
             MisNotasTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    AppNavigationHost(viewModel = viewModel)
+                    AppNavigationHost(
+                        viewModel = viewModel,
+                        currentLanguage = LanguageManager.current(this),
+                        onLanguageSelected = { LanguageManager.set(this, it) }
+                    )
                 }
             }
         }
@@ -70,7 +82,11 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun AppNavigationHost(viewModel: MainViewModel) {
+private fun AppNavigationHost(
+    viewModel: MainViewModel,
+    currentLanguage: AppLanguage,
+    onLanguageSelected: (AppLanguage) -> Unit
+) {
     val navController = rememberNavController()
 
     val isConfigured by viewModel.isConfigured.collectAsState()
@@ -189,7 +205,9 @@ private fun AppNavigationHost(viewModel: MainViewModel) {
                 },
                 getLastSync = {
                     viewModel.getLastSync()
-                }
+                },
+                currentLanguage = currentLanguage,
+                onLanguageSelected = onLanguageSelected
             )
         }
 

@@ -4,6 +4,10 @@
 
 package com.ferlagod.misnotas.ui.screen
 
+import android.text.format.DateFormat
+import androidx.compose.ui.res.pluralStringResource
+import com.ferlagod.misnotas.R
+import androidx.compose.ui.res.stringResource
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -136,6 +140,8 @@ fun NoteEditorScreen(
     val coroutineScope = rememberCoroutineScope()
 
     val context = LocalContext.current
+    val imageAlt = stringResource(R.string.image_alt)
+    val imageAddFailed = stringResource(R.string.image_add_failed)
 
     // Id estable: una nota nueva conserva el mismo id en todos los guardados.
     val stableId = rememberSaveable { noteId ?: UUID.randomUUID().toString() }
@@ -219,9 +225,9 @@ fun NoteEditorScreen(
             coroutineScope.launch {
                 try {
                     val reference = onAddImage(uri)
-                    insertMarkdownToken("\n![imagen]($reference)\n")
+                    insertMarkdownToken("\n![$imageAlt]($reference)\n")
                 } catch (e: Exception) {
-                    Toast.makeText(context, "No se pudo añadir la imagen", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, imageAddFailed, Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -245,11 +251,12 @@ fun NoteEditorScreen(
                 title = {
                     Column {
                         val formattedDate = remember(updatedAt) {
-                            val formatter = SimpleDateFormat("d MMM, HH:mm", Locale.forLanguageTag("es-ES"))
+                            val locale = Locale.getDefault()
+                            val formatter = SimpleDateFormat(DateFormat.getBestDateTimePattern(locale, "dMMMjmm"), locale)
                             formatter.format(Date(updatedAt))
                         }
                         Text(
-                            text = "Editado $formattedDate",
+                            text = stringResource(R.string.edited_at, formattedDate),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -264,7 +271,7 @@ fun NoteEditorScreen(
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = "Volver",
+                            contentDescription = stringResource(R.string.cd_back),
                             tint = primaryBlue
                         )
                     }
@@ -274,7 +281,7 @@ fun NoteEditorScreen(
                     IconButton(onClick = { isReadingMode = !isReadingMode }) {
                         Icon(
                             imageVector = if (isReadingMode) Icons.Rounded.Edit else Icons.Rounded.Visibility,
-                            contentDescription = if (isReadingMode) "Modo Edición" else "Modo Lectura",
+                            contentDescription = if (isReadingMode) stringResource(R.string.cd_edit_mode) else stringResource(R.string.cd_read_mode),
                             tint = if (isReadingMode) primaryBlue else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -283,7 +290,7 @@ fun NoteEditorScreen(
                     IconButton(onClick = { isPinned = !isPinned }) {
                         Icon(
                             imageVector = Icons.Rounded.PushPin,
-                            contentDescription = "Fijar nota",
+                            contentDescription = stringResource(R.string.cd_pin_note),
                             tint = if (isPinned) AccentOrange else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
                         )
                     }
@@ -293,7 +300,7 @@ fun NoteEditorScreen(
                         IconButton(onClick = { showDeleteConfirm = true }) {
                             Icon(
                                 imageVector = Icons.Rounded.Delete,
-                                contentDescription = "Eliminar",
+                                contentDescription = stringResource(R.string.delete),
                                 tint = AccentRed.copy(alpha = 0.8f)
                             )
                         }
@@ -422,7 +429,7 @@ fun NoteEditorScreen(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = currentFolder?.name ?: "Sin carpeta",
+                            text = currentFolder?.name ?: stringResource(R.string.no_folder),
                             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
                             color = MaterialTheme.colorScheme.onSurface
                         )
@@ -475,7 +482,7 @@ fun NoteEditorScreen(
                 decorationBox = { innerTextField ->
                     if (title.isEmpty()) {
                         Text(
-                            text = "Título",
+                            text = stringResource(R.string.title_hint),
                             style = MaterialTheme.typography.headlineSmall.copy(
                                 fontWeight = FontWeight.Bold
                             ),
@@ -513,7 +520,7 @@ fun NoteEditorScreen(
                         decorationBox = { innerTextField ->
                             if (textValue.text.isEmpty()) {
                                 Text(
-                                    text = "Escribe tu nota aquí... Usa formato Markdown, listas de tareas o adjunta fotos.",
+                                    text = stringResource(R.string.note_hint),
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
                                     lineHeight = 24.sp
@@ -533,7 +540,11 @@ fun NoteEditorScreen(
                 horizontalArrangement = Arrangement.Center
             ) {
                 Text(
-                    text = "$wordCount palabras  •  $charCount caracteres",
+                    text = stringResource(
+                        R.string.word_count_separator,
+                        pluralStringResource(R.plurals.word_count, wordCount, wordCount),
+                        pluralStringResource(R.plurals.char_count, charCount, charCount)
+                    ),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                 )
@@ -547,7 +558,7 @@ fun NoteEditorScreen(
     if (showFolderPicker) {
         AlertDialog(
             onDismissRequest = { showFolderPicker = false },
-            title = { Text("Mover a carpeta", fontWeight = FontWeight.Bold) },
+            title = { Text(stringResource(R.string.move_to_folder), fontWeight = FontWeight.Bold) },
             text = {
                 Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                     // Opción Sin Carpeta
@@ -562,7 +573,7 @@ fun NoteEditorScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "📁 Sin carpeta (General)",
+                            text = stringResource(R.string.no_folder_general),
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = if (selectedFolderId == null) FontWeight.Bold else FontWeight.Normal,
                             color = if (selectedFolderId == null) primaryBlue else MaterialTheme.colorScheme.onSurface
@@ -600,7 +611,7 @@ fun NoteEditorScreen(
             },
             confirmButton = {
                 TextButton(onClick = { showFolderPicker = false }) {
-                    Text("Cerrar")
+                    Text(stringResource(R.string.close))
                 }
             }
         )
@@ -610,8 +621,8 @@ fun NoteEditorScreen(
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("¿Mover a papelera?", fontWeight = FontWeight.Bold) },
-            text = { Text("La nota se enviará a la papelera. Podrás restaurarla cuando desees.") },
+            title = { Text(stringResource(R.string.move_to_trash_title), fontWeight = FontWeight.Bold) },
+            text = { Text(stringResource(R.string.move_to_trash_message)) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -625,12 +636,12 @@ fun NoteEditorScreen(
                     colors = ButtonDefaults.buttonColors(containerColor = AccentRed),
                     shape = RoundedCornerShape(10.dp)
                 ) {
-                    Text("Mover a papelera", color = Color.White)
+                    Text(stringResource(R.string.move_to_trash), color = Color.White)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteConfirm = false }) {
-                    Text("Cancelar")
+                    Text(stringResource(R.string.cancel))
                 }
             }
         )

@@ -99,7 +99,7 @@ class WebDavClient(
             // 405 = ya existe
             if (response.isSuccessful || response.code == 405) return@withContext
             if (response.code == 409) {
-                throw WebDavException(409, "La ruta WebDAV no existe. Revisa la URL del servidor y el usuario.")
+                throw WebDavException(409, "WebDAV path not found", WebDavException.Reason.PATH_NOT_FOUND)
             }
             throw WebDavException(response.code, "No se pudo crear la carpeta en Nextcloud (${response.code})")
         }

@@ -37,14 +37,18 @@ enum class MissingRemoteAction { NOTHING, DELETE_LOCAL, MARK_FOR_UPLOAD, FORGET_
  */
 object SyncMerger {
 
-    const val CONFLICT_SUFFIX = " (conflicto)"
+    const val CONFLICT_SUFFIX = " (conflict)"
+    const val UNTITLED = "Untitled"
 
     fun resolveNote(
         local: NoteEntity?,
         remote: RemoteRecord<NoteEntity>,
         etag: String?,
-        newId: () -> String
+        newId: () -> String,
+        conflictSuffix: String = CONFLICT_SUFFIX,
+        untitled: String = UNTITLED
     ): MergeAction<NoteEntity> {
+        fun copyOf(note: NoteEntity) = asConflictCopy(note, newId(), conflictSuffix, untitled)
         when (remote) {
             is RemoteRecord.Tombstone -> return when {
                 local == null -> MergeAction.Skip
@@ -67,11 +71,11 @@ object SyncMerger {
                         sameNoteContent(local, remoteNote) -> MergeAction.KeepLocal(etag)
                         remoteNote.updatedAt > local.updatedAt -> MergeAction.Conflict(
                             main = remoteNote,
-                            copy = asConflictCopy(local, newId())
+                            copy = copyOf(local)
                         )
                         else -> MergeAction.Conflict(
                             main = local.copy(remoteEtag = etag),
-                            copy = asConflictCopy(remoteNote, newId())
+                            copy = copyOf(remoteNote)
                         )
                     }
                 }
@@ -119,9 +123,9 @@ object SyncMerger {
             a.isPinned == b.isPinned &&
             a.isDeleted == b.isDeleted
 
-    private fun asConflictCopy(note: NoteEntity, id: String) = note.copy(
+    private fun asConflictCopy(note: NoteEntity, id: String, suffix: String, untitled: String) = note.copy(
         id = id,
-        title = (note.title.ifBlank { "Sin título" }) + CONFLICT_SUFFIX,
+        title = note.title.ifBlank { untitled } + suffix,
         isPinned = false,
         syncStatus = SyncStatus.PENDING_UPLOAD,
         remoteEtag = null

@@ -4,6 +4,16 @@
 
 package com.ferlagod.misnotas.ui.screen
 
+import androidx.compose.ui.semantics.Role
+import androidx.compose.material3.RadioButtonDefaults
+import androidx.compose.material3.RadioButton
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.selectable
+import com.ferlagod.misnotas.util.AppLanguage
+import android.text.format.DateFormat
+import androidx.compose.ui.res.pluralStringResource
+import com.ferlagod.misnotas.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -94,8 +104,16 @@ fun SettingsDialog(
     onSaveNextcloud: (serverUrl: String, user: String, appPass: String, masterPass: String, onSuccess: () -> Unit, onError: (String) -> Unit) -> Unit,
     onDisconnectNextcloud: () -> Unit,
     onTriggerSync: () -> Unit,
-    lastSync: Long? = null
+    lastSync: Long? = null,
+    currentLanguage: AppLanguage = AppLanguage.SYSTEM,
+    onLanguageSelected: (AppLanguage) -> Unit = {}
 ) {
+    val msgRequiredFields = stringResource(R.string.error_required_fields)
+    val msgMasterRequired = stringResource(R.string.error_master_required)
+    val msgConnected = stringResource(R.string.account_connected_syncing)
+    val msgSyncStarted = stringResource(R.string.sync_started)
+    val msgDisconnected = stringResource(R.string.disconnected_message)
+
     val isDark = isSystemInDarkTheme()
     val primaryBlue = if (isDark) RoyalBlueDark else RoyalBlueLight
     val focusManager = LocalFocusManager.current
@@ -154,7 +172,7 @@ fun SettingsDialog(
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
                             Text(
-                                text = "Ajustes",
+                                text = stringResource(R.string.settings_title),
                                 style = MaterialTheme.typography.titleLarge.copy(
                                     fontWeight = FontWeight.Bold,
                                     letterSpacing = (-0.3).sp
@@ -162,7 +180,7 @@ fun SettingsDialog(
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "Sincronización y Cifrado",
+                                text = stringResource(R.string.settings_subtitle),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -172,7 +190,7 @@ fun SettingsDialog(
                     IconButton(onClick = onDismiss) {
                         Icon(
                             imageVector = Icons.Rounded.Close,
-                            contentDescription = "Cerrar",
+                            contentDescription = stringResource(R.string.close),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -220,7 +238,7 @@ fun SettingsDialog(
 
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = if (isConfigured) "Nextcloud Conectado" else "Modo Local (Sin sincronización)",
+                                    text = if (isConfigured) stringResource(R.string.nextcloud_connected) else stringResource(R.string.local_mode),
                                     style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
@@ -228,18 +246,19 @@ fun SettingsDialog(
                                     text = if (isConfigured) {
                                         "${currentCredentials?.username ?: ""} • ${currentCredentials?.serverUrl ?: ""}"
                                     } else {
-                                        "Tus notas se guardan solo en este dispositivo de forma privada."
+                                        stringResource(R.string.local_mode_desc)
                                     },
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 if (isConfigured) {
                                     val statusText = when (syncState) {
-                                        is SyncState.Syncing -> syncState.message
-                                        is SyncState.Error -> "Error: ${syncState.message}"
-                                        is SyncState.Success -> "Sincronizado: ${formatSyncTime(syncState.timestamp)}" +
-                                            if (syncState.warnings > 0) " (${syncState.warnings} ficheros no se pudieron leer)" else ""
-                                        SyncState.Idle -> lastSync?.let { "Última sincronización: ${formatSyncTime(it)}" } ?: "Pendiente de sincronizar"
+                                        is SyncState.Syncing -> stringResource(syncState.stage.labelRes)
+                                        is SyncState.Error -> stringResource(R.string.status_error, syncState.message)
+                                        is SyncState.Success -> stringResource(R.string.status_synced, formatSyncTime(syncState.timestamp)) +
+                                            if (syncState.warnings > 0) " " + pluralStringResource(R.plurals.sync_warnings, syncState.warnings, syncState.warnings) else ""
+                                        SyncState.Idle -> lastSync?.let { stringResource(R.string.status_last_sync, formatSyncTime(it)) }
+                                            ?: stringResource(R.string.status_pending)
                                     }
                                     Text(
                                         text = statusText,
@@ -255,7 +274,7 @@ fun SettingsDialog(
 
                     // Sección: SERVIDOR WEBDAV / NEXTCLOUD
                     Text(
-                        text = "CUENTA NEXTCLOUD",
+                        text = stringResource(R.string.section_account),
                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                         color = primaryBlue
                     )
@@ -265,7 +284,7 @@ fun SettingsDialog(
                     SettingsTextField(
                         value = serverUrl,
                         onValueChange = { serverUrl = it; errorMessage = null; successMessage = null },
-                        placeholder = "https://nube.tu-servidor.com",
+                        placeholder = stringResource(R.string.server_hint),
                         leadingIcon = Icons.Rounded.Storage,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Next)
                     )
@@ -275,7 +294,7 @@ fun SettingsDialog(
                     SettingsTextField(
                         value = username,
                         onValueChange = { username = it; errorMessage = null; successMessage = null },
-                        placeholder = "Usuario de Nextcloud",
+                        placeholder = stringResource(R.string.username_hint),
                         leadingIcon = Icons.Rounded.Person,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Next)
                     )
@@ -285,7 +304,7 @@ fun SettingsDialog(
                     SettingsTextField(
                         value = appPassword,
                         onValueChange = { appPassword = it; errorMessage = null; successMessage = null },
-                        placeholder = "Contraseña de aplicación",
+                        placeholder = stringResource(R.string.app_password_hint),
                         leadingIcon = Icons.Rounded.Key,
                         isPassword = true,
                         passwordVisible = passwordVisible,
@@ -305,7 +324,7 @@ fun SettingsDialog(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "CIFRADO DE EXTREMO A EXTREMO (E2EE)",
+                            text = stringResource(R.string.section_e2ee),
                             style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                             color = primaryBlue
                         )
@@ -314,7 +333,7 @@ fun SettingsDialog(
                     Spacer(modifier = Modifier.height(4.dp))
 
                     Text(
-                        text = "Tus notas se cifran con AES-256 en este dispositivo antes de subirse. Usa la misma contraseña maestra en todos tus dispositivos. Si la olvidas, nadie podrá recuperar tus notas.",
+                        text = stringResource(R.string.e2ee_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -324,7 +343,7 @@ fun SettingsDialog(
                     SettingsTextField(
                         value = masterPassword,
                         onValueChange = { masterPassword = it; errorMessage = null; successMessage = null },
-                        placeholder = "Contraseña maestra",
+                        placeholder = stringResource(R.string.master_password_hint),
                         leadingIcon = Icons.Rounded.Lock,
                         isPassword = true,
                         passwordVisible = masterPasswordVisible,
@@ -359,11 +378,11 @@ fun SettingsDialog(
                         onClick = {
                             focusManager.clearFocus()
                             if (serverUrl.isBlank() || username.isBlank() || appPassword.isBlank()) {
-                                errorMessage = "Servidor, usuario y contraseña son obligatorios"
+                                errorMessage = msgRequiredFields
                                 return@Button
                             }
                             if (masterPassword.isBlank()) {
-                                errorMessage = "Introduce la contraseña maestra para el cifrado E2EE"
+                                errorMessage = msgMasterRequired
                                 return@Button
                             }
 
@@ -378,7 +397,7 @@ fun SettingsDialog(
                                 masterPassword,
                                 {
                                     isLoading = false
-                                    successMessage = "Cuenta conectada. Sincronizando..."
+                                    successMessage = msgConnected
                                 },
                                 { error ->
                                     isLoading = false
@@ -404,7 +423,7 @@ fun SettingsDialog(
                             )
                         } else {
                             Text(
-                                text = if (isConfigured) "Actualizar y Sincronizar" else "Conectar y Cifrar",
+                                text = if (isConfigured) stringResource(R.string.update_and_sync) else stringResource(R.string.connect_and_encrypt),
                                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
                             )
                         }
@@ -421,7 +440,7 @@ fun SettingsDialog(
                             OutlinedButton(
                                 onClick = {
                                     onTriggerSync()
-                                    successMessage = "Sincronización iniciada"
+                                    successMessage = msgSyncStarted
                                 },
                                 shape = RoundedCornerShape(12.dp),
                                 modifier = Modifier
@@ -434,7 +453,7 @@ fun SettingsDialog(
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("Sincronizar")
+                                Text(stringResource(R.string.sync_now))
                             }
 
                             OutlinedButton(
@@ -454,7 +473,7 @@ fun SettingsDialog(
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("Desconectar")
+                                Text(stringResource(R.string.disconnect))
                             }
                         }
 
@@ -470,12 +489,12 @@ fun SettingsDialog(
                                     .padding(12.dp)
                             ) {
                                 Text(
-                                    text = "¿Desconectar de Nextcloud?",
+                                    text = stringResource(R.string.disconnect_title),
                                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                                     color = AccentRed
                                 )
                                 Text(
-                                    text = "Volverás a modo local. Las notas almacenadas en este dispositivo se conservarán.",
+                                    text = stringResource(R.string.disconnect_message),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
@@ -485,7 +504,7 @@ fun SettingsDialog(
                                     horizontalArrangement = Arrangement.End
                                 ) {
                                     TextButton(onClick = { showDisconnectConfirm = false }) {
-                                        Text("Cancelar", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text(stringResource(R.string.cancel), color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Button(
@@ -496,17 +515,23 @@ fun SettingsDialog(
                                             username = ""
                                             appPassword = ""
                                             masterPassword = ""
-                                            successMessage = "Cuenta desconectada. Modo local activo."
+                                            successMessage = msgDisconnected
                                         },
                                         colors = ButtonDefaults.buttonColors(containerColor = AccentRed),
                                         shape = RoundedCornerShape(8.dp)
                                     ) {
-                                        Text("Sí, desconectar", color = Color.White)
+                                        Text(stringResource(R.string.disconnect_confirm), color = Color.White)
                                     }
                                 }
                             }
                         }
                     }
+
+                    LanguageSection(
+                        current = currentLanguage,
+                        primaryBlue = primaryBlue,
+                        onSelected = onLanguageSelected
+                    )
 
                     AboutSection(primaryBlue = primaryBlue)
                 }
@@ -515,35 +540,87 @@ fun SettingsDialog(
     }
 }
 
-private fun formatSyncTime(timestamp: Long): String =
-    SimpleDateFormat("d MMM, HH:mm", Locale.forLanguageTag("es-ES")).format(Date(timestamp))
+private fun formatSyncTime(timestamp: Long): String {
+    val locale = Locale.getDefault()
+    return SimpleDateFormat(DateFormat.getBestDateTimePattern(locale, "dMMMjmm"), locale).format(Date(timestamp))
+}
+
+@Composable
+private fun LanguageSection(
+    current: AppLanguage,
+    primaryBlue: Color,
+    onSelected: (AppLanguage) -> Unit
+) {
+    Spacer(modifier = Modifier.height(24.dp))
+    Text(
+        text = stringResource(R.string.section_language),
+        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+    Spacer(modifier = Modifier.height(6.dp))
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.selectableGroup()) {
+            AppLanguage.entries.forEach { language ->
+                val label = if (language == AppLanguage.SYSTEM) stringResource(R.string.language_system) else language.nativeName
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .selectable(
+                            selected = language == current,
+                            onClick = { if (language != current) onSelected(language) },
+                            role = Role.RadioButton
+                        )
+                        .padding(horizontal = 12.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(
+                        selected = language == current,
+                        onClick = null,
+                        colors = RadioButtonDefaults.colors(selectedColor = primaryBlue)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+                }
+            }
+        }
+    }
+}
 
 @Composable
 private fun AboutSection(primaryBlue: Color) {
     val uriHandler = LocalUriHandler.current
     Spacer(modifier = Modifier.height(24.dp))
     Text(
-        text = "ACERCA DE",
+        text = stringResource(R.string.section_about),
         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
     Spacer(modifier = Modifier.height(6.dp))
     Text(
-        text = "Mis Notas ${BuildConfig.VERSION_NAME}",
+        text = stringResource(R.string.about_version, BuildConfig.VERSION_NAME),
         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
         color = MaterialTheme.colorScheme.onSurface
     )
     Text(
-        text = "Software libre bajo licencia GNU GPL v3 o posterior. Se distribuye SIN NINGUNA GARANTÍA.",
+        text = stringResource(R.string.about_license),
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
     Row {
         TextButton(onClick = { uriHandler.openUri(REPO_URL) }) {
-            Text("Código fuente", color = primaryBlue)
+            Text(stringResource(R.string.source_code), color = primaryBlue)
         }
         TextButton(onClick = { uriHandler.openUri("https://www.gnu.org/licenses/gpl-3.0.html") }) {
-            Text("Licencia", color = primaryBlue)
+            Text(stringResource(R.string.license), color = primaryBlue)
         }
     }
 }
@@ -585,7 +662,7 @@ private fun SettingsTextField(
                 IconButton(onClick = onTogglePassword) {
                     Icon(
                         imageVector = if (passwordVisible) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
-                        contentDescription = "Alternar contraseña",
+                        contentDescription = stringResource(R.string.cd_toggle_password),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(20.dp)
                     )

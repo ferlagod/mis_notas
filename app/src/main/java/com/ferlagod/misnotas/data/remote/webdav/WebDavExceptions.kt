@@ -7,7 +7,9 @@ package com.ferlagod.misnotas.data.remote.webdav
 import java.io.IOException
 
 /** Error HTTP devuelto por el servidor WebDAV. */
-open class WebDavException(val code: Int, message: String) : IOException(message)
+open class WebDavException(val code: Int, message: String, val reason: Reason = Reason.HTTP) : IOException(message) {
+    enum class Reason { HTTP, PATH_NOT_FOUND }
+}
 
 /** 401/403: usuario o contraseña de aplicación incorrectos. */
 class WebDavAuthException(code: Int) :
