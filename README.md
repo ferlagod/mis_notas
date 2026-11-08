@@ -21,14 +21,19 @@ Mis Notas combina el aspecto limpio de Apple Notas y Google Keep con la organiza
 ## Características
 
 - **Local primero**: funciona sin conexión y sin cuenta. La sincronización es opcional.
-- **Carpetas anidadas** con colores, notas fijadas y papelera con restauración.
-- **Markdown**: títulos, negrita, cursiva, tachado, código, bloques de código, citas, listas, listas numeradas, enlaces, separadores y **listas de tareas** que se marcan con un toque.
-- **Imágenes** adjuntas (se comprimen a WebP y se sincronizan como ficheros cifrados aparte).
-- **Vista de cuadrícula o lista**, búsqueda instantánea y tarjetas de colores.
+- **Carpetas anidadas** con colores, notas fijadas y papelera con restauración (y vaciado automático a los 30 días, desactivable).
+- **Markdown**: títulos, negrita, cursiva, tachado, código, bloques de código, citas, listas, listas numeradas, tablas, enlaces (también direcciones sueltas), separadores y **listas de tareas** que se marcan con un toque.
+- **Editor cómodo**: deshacer/rehacer, las listas continúan solas al pulsar Intro, barra de formato que actúa sobre la línea o la selección, contador de palabras y tiempo de lectura.
+- **Imágenes** adjuntas (varias a la vez; se comprimen a WebP y se sincronizan como ficheros cifrados aparte) con visor a pantalla completa y zoom.
+- **Selección múltiple** con pulsación larga: fijar, cambiar color, mover de carpeta o borrar varias notas a la vez, y **"Deshacer"** al mandar algo a la papelera.
+- **Vista de cuadrícula o lista**, orden por fecha o título, búsqueda instantánea que ignora acentos y resalta los resultados, progreso de las listas de tareas en cada tarjeta.
+- **Compartir**: envía notas a otras apps, cópialas o duplícalas, y crea notas desde "Compartir" en cualquier app (texto o imágenes). Acceso directo "Nueva nota" manteniendo pulsado el icono.
+- **Copia de seguridad en Markdown**: exporta todo a un ZIP (carpetas, imágenes y metadatos) e importa `.zip`, `.md` y `.txt`. Compatible con Obsidian, Joplin, etc.
+- **Bloqueo de la app** con huella, cara o PIN del dispositivo, y contenido oculto en las apps recientes.
 - **Sincronización con Nextcloud** (WebDAV) automática: al abrir la app, al editar y cada ~30 minutos en segundo plano.
 - **Cifrado de extremo a extremo** AES-256-GCM con una contraseña maestra que nunca sale del dispositivo.
 - **Sin conflictos silenciosos**: si una nota se edita a la vez en dos dispositivos, se conservan ambas versiones.
-- Tema claro y oscuro (negro puro en OLED).
+- Tema claro, oscuro (negro puro en OLED) o el del sistema, e icono temático en Android 13+.
 - **Disponible en español, inglés, francés, alemán e italiano**: se elige en Ajustes (o "Idioma del sistema"). En Android 13+ también desde los ajustes de idioma del sistema.
 - Sin anuncios, sin rastreadores, sin servicios de Google.
 
@@ -42,7 +47,7 @@ Requisitos: Android 8.0 (API 26) o superior.
 ## Conectar con Nextcloud
 
 1. En la web de tu Nextcloud ve a **Ajustes personales → Seguridad → Dispositivos y sesiones** y crea una **contraseña de aplicación** (por ejemplo "Mis Notas"). No uses tu contraseña normal.
-2. En la app, abre **Ajustes** (icono de engranaje) e introduce:
+2. En la app, abre **Ajustes** (icono de engranaje) → **Sincronización con Nextcloud** e introduce:
    - **Servidor**: la dirección de tu Nextcloud, p. ej. `https://nube.ejemplo.com`.
      También puedes pegar una URL WebDAV completa (`https://…/remote.php/dav/files/usuario/carpeta`).
    - **Usuario** y la **contraseña de aplicación** del paso 1.
@@ -85,6 +90,7 @@ git clone https://github.com/ferlagod/mis_notas.git
 cd mis_notas
 ./gradlew assembleDebug          # APK de depuración en app/build/outputs/apk/debug/
 ./gradlew testDebugUnitTest      # tests unitarios
+./gradlew lintDebug              # análisis estático (lo ejecuta también el CI)
 ```
 
 ### Firmar una versión release
@@ -104,12 +110,13 @@ Para firmar en GitHub Actions, consulta [CONTRIBUTING.md](CONTRIBUTING.md#public
 app/src/main/java/com/ferlagod/misnotas/
 ├── data/
 │   ├── attachment/   Almacén local de imágenes adjuntas
-│   ├── local/        Room: entidades, DAOs, migraciones, preferencias seguras
+│   ├── backup/       Exportar/importar notas en Markdown (ZIP)
+│   ├── local/        Room: entidades, DAOs, migraciones, árbol de carpetas, preferencias
 │   ├── remote/       Cliente WebDAV (OkHttp)
 │   └── sync/         Bóveda, formato remoto, reglas de fusión, sincronización y WorkManager
 ├── security/         Cifrado (PBKDF2 + AES-GCM)
-├── ui/               Pantallas Jetpack Compose, tema y lector Markdown
-└── util/             Compresión de imágenes e idioma de la app
+├── ui/               Pantallas Jetpack Compose, componentes, tema, lector y editor Markdown
+└── util/             Imágenes, idioma, búsqueda y bloqueo de la app
 
 app/src/main/res/values*/strings.xml   Textos (inglés por defecto; es, fr, de, it)
 ```

@@ -4,9 +4,6 @@
 
 package com.ferlagod.misnotas.ui.screen
 
-import com.ferlagod.misnotas.R
-import com.ferlagod.misnotas.util.AppLanguage
-import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -15,10 +12,10 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,69 +24,89 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Note
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.Clear
 import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.CreateNewFolder
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.PushPin
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ferlagod.misnotas.R
 import com.ferlagod.misnotas.data.local.entity.FolderEntity
 import com.ferlagod.misnotas.data.local.entity.NoteEntity
-import com.ferlagod.misnotas.data.local.pref.NextcloudCredentials
+import com.ferlagod.misnotas.data.local.model.FolderTree
 import com.ferlagod.misnotas.data.sync.SyncState
+import com.ferlagod.misnotas.ui.components.ColorPalette
+import com.ferlagod.misnotas.ui.components.FolderPickerDialog
 import com.ferlagod.misnotas.ui.theme.AccentGreen
 import com.ferlagod.misnotas.ui.theme.AccentOrange
 import com.ferlagod.misnotas.ui.theme.AccentRed
 import com.ferlagod.misnotas.ui.theme.NoteColor
-import com.ferlagod.misnotas.ui.theme.RoyalBlueDark
-import com.ferlagod.misnotas.ui.theme.RoyalBlueLight
 import com.ferlagod.misnotas.ui.theme.getAccentColor
+import com.ferlagod.misnotas.ui.theme.isAppInDarkTheme
 import com.ferlagod.misnotas.ui.viewmodel.NotesFilter
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -102,279 +119,210 @@ fun FoldersScreen(
     pinnedNotesCount: Int,
     trashNotesCount: Int,
     syncState: SyncState,
+    snackbarHostState: SnackbarHostState,
     onSelectFilter: (NotesFilter) -> Unit,
+    onSearch: (String) -> Unit,
+    onNewNote: () -> Unit,
     onCreateFolder: (name: String, color: NoteColor, parentId: String?) -> Unit,
     onUpdateFolder: (id: String, name: String, color: NoteColor, parentId: String?) -> Unit,
     onDeleteFolder: (String) -> Unit,
     onTriggerSync: () -> Unit,
     onLockApp: () -> Unit,
-    onConfigureNextcloud: (serverUrl: String, user: String, appPass: String, masterPass: String, onSuccess: () -> Unit, onError: (String) -> Unit) -> Unit,
-    onDisconnectNextcloud: () -> Unit,
-    getCredentials: () -> NextcloudCredentials?,
-    getLastSync: () -> Long? = { null },
-    currentLanguage: AppLanguage = AppLanguage.SYSTEM,
-    onLanguageSelected: (AppLanguage) -> Unit = {}
+    onOpenSettings: () -> Unit
 ) {
-    val isDark = isSystemInDarkTheme()
-    val primaryBlue = if (isDark) RoyalBlueDark else RoyalBlueLight
+    val isDark = isAppInDarkTheme()
+    val primary = MaterialTheme.colorScheme.primary
+    val focusManager = LocalFocusManager.current
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
 
     var showCreateFolderDialog by remember { mutableStateOf(false) }
     var parentForNewFolder by remember { mutableStateOf<String?>(null) }
     var folderToEdit by remember { mutableStateOf<FolderEntity?>(null) }
     var folderToDelete by remember { mutableStateOf<FolderEntity?>(null) }
-    var showSettingsDialog by remember { mutableStateOf(false) }
+    var query by rememberSaveable { mutableStateOf("") }
+
+    val tree = remember(folders) { FolderTree.flatten(folders) }
+    val countByFolder = remember(notes) { notes.groupingBy { it.folderId }.eachCount() }
 
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            TopAppBar(
+            LargeTopAppBar(
                 title = {
                     Text(
                         text = stringResource(R.string.folders_title),
-                        style = MaterialTheme.typography.headlineMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = (-0.5).sp
-                        ),
-                        color = MaterialTheme.colorScheme.onBackground
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = (-0.5).sp
                     )
                 },
                 actions = {
-                    // Botón/Indicador de sincronización con estado cromático
                     SyncStatusIconButton(
                         isConfigured = isConfigured,
                         syncState = syncState,
-                        onClick = {
-                            if (isConfigured) {
-                                onTriggerSync()
-                            } else {
-                                showSettingsDialog = true
-                            }
-                        }
+                        onClick = { if (isConfigured) onTriggerSync() else onOpenSettings() }
                     )
-
-                    // Ajustes de sincronización y cifrado
-                    IconButton(onClick = { showSettingsDialog = true }) {
-                        Icon(
-                            imageVector = Icons.Rounded.Settings,
-                            contentDescription = stringResource(R.string.cd_settings),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    // Bloquear bóveda (solo visible si Nextcloud / clave maestra están configuradas)
                     if (isConfigured) {
                         IconButton(onClick = onLockApp) {
-                            Icon(
-                                imageVector = Icons.Rounded.Lock,
-                                contentDescription = stringResource(R.string.cd_lock),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            Icon(Icons.Rounded.Lock, contentDescription = stringResource(R.string.cd_lock), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
+                    }
+                    IconButton(onClick = onOpenSettings) {
+                        Icon(Icons.Rounded.Settings, contentDescription = stringResource(R.string.cd_settings), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                )
+                    containerColor = MaterialTheme.colorScheme.background,
+                    scrolledContainerColor = MaterialTheme.colorScheme.background
+                ),
+                scrollBehavior = scrollBehavior
             )
         },
-        bottomBar = {
-            Surface(
-                color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 3.dp,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    TextButton(
-                        onClick = {
-                            parentForNewFolder = null
-                            showCreateFolderDialog = true
-                        }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Add,
-                            contentDescription = null,
-                            tint = primaryBlue,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = stringResource(R.string.new_folder),
-                            color = primaryBlue,
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        )
-                    }
-                }
-            }
+        floatingActionButton = {
+            ExtendedFloatingActionButton(
+                onClick = onNewNote,
+                icon = { Icon(Icons.Rounded.EditNote, contentDescription = null) },
+                text = { Text(stringResource(R.string.cd_new_note), fontWeight = FontWeight.SemiBold) },
+                containerColor = primary,
+                contentColor = Color.White,
+                expanded = scrollBehavior.state.collapsedFraction < 0.5f
+            )
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .padding(paddingValues),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 104.dp)
         ) {
-            // ACCESOS RÁPIDOS SUPERIORES (Estilo Inset Grouped List de Apple Notes)
-            Text(
-                text = stringResource(R.string.quick_views),
-                style = MaterialTheme.typography.labelMedium.copy(
-                    fontWeight = FontWeight.SemiBold
-                ),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 12.dp, bottom = 8.dp, top = 4.dp)
-            )
-
-            Surface(
-                shape = RoundedCornerShape(14.dp),
-                color = MaterialTheme.colorScheme.surface,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column {
-                    QuickAccessRow(
-                        title = stringResource(R.string.all_notes),
-                        icon = Icons.AutoMirrored.Rounded.Note,
-                        iconTint = primaryBlue,
-                        count = totalNotesCount,
-                        onClick = { onSelectFilter(NotesFilter.All) }
-                    )
-
-                    HorizontalDivider(
-                        thickness = 0.5.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant,
-                        modifier = Modifier.padding(start = 52.dp)
-                    )
-
-                    QuickAccessRow(
-                        title = stringResource(R.string.pinned),
-                        icon = Icons.Rounded.PushPin,
-                        iconTint = AccentOrange,
-                        count = pinnedNotesCount,
-                        onClick = { onSelectFilter(NotesFilter.Pinned) }
-                    )
-
-                    HorizontalDivider(
-                        thickness = 0.5.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant,
-                        modifier = Modifier.padding(start = 52.dp)
-                    )
-
-                    QuickAccessRow(
-                        title = stringResource(R.string.trash),
-                        icon = Icons.Rounded.Delete,
-                        iconTint = AccentRed,
-                        count = trashNotesCount,
-                        onClick = { onSelectFilter(NotesFilter.Trash) }
-                    )
-                }
+            item(key = "search") {
+                GlobalSearchField(
+                    query = query,
+                    onQueryChange = { query = it },
+                    onSearch = {
+                        focusManager.clearFocus()
+                        onSearch(query.trim())
+                        query = ""
+                    }
+                )
+                Spacer(modifier = Modifier.height(18.dp))
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // LISTA DE CARPETAS JERÁRQUICAS (Joplin / Notesnook organization)
-            Text(
-                text = stringResource(R.string.my_folders),
-                style = MaterialTheme.typography.labelMedium.copy(
-                    fontWeight = FontWeight.SemiBold
-                ),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 12.dp, bottom = 8.dp)
-            )
-
-            if (folders.isEmpty()) {
-                Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = MaterialTheme.colorScheme.surface,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(24.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = stringResource(R.string.no_folders),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            } else {
+            item(key = "quick") {
+                GroupLabel(stringResource(R.string.quick_views))
                 Surface(
                     shape = RoundedCornerShape(14.dp),
                     color = MaterialTheme.colorScheme.surface,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column {
-                        // Construir árbol de carpetas con jerarquía y sangrado
-                        val rootFolders = folders.filter { it.parentId == null }
-                        val childMap = folders.filter { it.parentId != null }.groupBy { it.parentId }
+                        QuickAccessRow(
+                            title = stringResource(R.string.all_notes),
+                            icon = Icons.AutoMirrored.Rounded.Note,
+                            iconTint = primary,
+                            count = totalNotesCount,
+                            onClick = { onSelectFilter(NotesFilter.All) }
+                        )
+                        RowDivider(start = 62.dp)
+                        QuickAccessRow(
+                            title = stringResource(R.string.pinned),
+                            icon = Icons.Rounded.PushPin,
+                            iconTint = AccentOrange,
+                            count = pinnedNotesCount,
+                            onClick = { onSelectFilter(NotesFilter.Pinned) }
+                        )
+                        RowDivider(start = 62.dp)
+                        QuickAccessRow(
+                            title = stringResource(R.string.trash),
+                            icon = Icons.Rounded.Delete,
+                            iconTint = AccentRed,
+                            count = trashNotesCount,
+                            onClick = { onSelectFilter(NotesFilter.Trash) }
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(24.dp))
+            }
 
-                        val flattenedTree = mutableListOf<Pair<FolderEntity, Int>>()
-                        fun addNode(folder: FolderEntity, level: Int) {
-                            flattenedTree.add(folder to level)
-                            childMap[folder.id]?.forEach { child ->
-                                addNode(child, level + 1)
-                            }
-                        }
-                        rootFolders.forEach { addNode(it, 0) }
-
-                        // Carpetas huérfanas si existieran
-                        val addedIds = flattenedTree.map { it.first.id }.toSet()
-                        folders.filterNot { addedIds.contains(it.id) }.forEach {
-                            flattenedTree.add(it to 0)
-                        }
-
-                        flattenedTree.forEachIndexed { index, (folder, level) ->
-                            val folderNotesCount = notes.count { it.folderId == folder.id && !it.isDeleted }
-                            val noteColor = NoteColor.fromKey(folder.color)
-                            val tint = noteColor.getAccentColor(isDark)
-
-                            FolderRow(
-                                name = folder.name,
-                                tint = tint,
-                                count = folderNotesCount,
-                                indentationLevel = level,
-                                onClick = {
-                                    onSelectFilter(NotesFilter.Folder(folder.id, folder.name))
-                                },
-                                onAddSubfolder = {
-                                    parentForNewFolder = folder.id
-                                    showCreateFolderDialog = true
-                                },
-                                onEdit = {
-                                    folderToEdit = folder
-                                },
-                                onDelete = {
-                                    folderToDelete = folder
-                                }
-                            )
-
-                            if (index < flattenedTree.lastIndex) {
-                                HorizontalDivider(
-                                    thickness = 0.5.dp,
-                                    color = MaterialTheme.colorScheme.outlineVariant,
-                                    modifier = Modifier.padding(start = (52 + level * 16).dp)
-                                )
-                            }
-                        }
+            item(key = "folders_header") {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    GroupLabel(stringResource(R.string.my_folders), modifier = Modifier.weight(1f))
+                    TextButton(onClick = {
+                        parentForNewFolder = null
+                        showCreateFolderDialog = true
+                    }) {
+                        Icon(Icons.Rounded.CreateNewFolder, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(stringResource(R.string.new_folder), fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(40.dp))
+            if (tree.isEmpty()) {
+                item(key = "no_folders") {
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        onClick = {
+                            parentForNewFolder = null
+                            showCreateFolderDialog = true
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Icon(Icons.Rounded.CreateNewFolder, contentDescription = null, tint = primary, modifier = Modifier.size(32.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = stringResource(R.string.no_folders),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            } else {
+                itemsIndexed(tree, key = { _, (folder, _) -> folder.id }) { index, (folder, level) ->
+                    val shape = when {
+                        tree.size == 1 -> RoundedCornerShape(14.dp)
+                        index == 0 -> RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp)
+                        index == tree.lastIndex -> RoundedCornerShape(bottomStart = 14.dp, bottomEnd = 14.dp)
+                        else -> RoundedCornerShape(0.dp)
+                    }
+                    Surface(
+                        shape = shape,
+                        color = MaterialTheme.colorScheme.surface,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .animateItem()
+                    ) {
+                        Column {
+                            FolderRow(
+                                name = folder.name,
+                                tint = NoteColor.fromKey(folder.color).let { c ->
+                                    if (c == NoteColor.DEFAULT) primary else c.getAccentColor(isDark)
+                                },
+                                count = countByFolder[folder.id] ?: 0,
+                                indentationLevel = level,
+                                onClick = { onSelectFilter(NotesFilter.Folder(folder.id, folder.name)) },
+                                onAddSubfolder = {
+                                    parentForNewFolder = folder.id
+                                    showCreateFolderDialog = true
+                                },
+                                onEdit = { folderToEdit = folder },
+                                onDelete = { folderToDelete = folder }
+                            )
+                            if (index < tree.lastIndex) RowDivider(start = (58 + level * 18).dp)
+                        }
+                    }
+                }
+            }
         }
     }
 
-    // DIÁLOGO PARA CREAR CARPETA / SUBCARPETA
     if (showCreateFolderDialog) {
         FolderDialog(
             title = if (parentForNewFolder != null) stringResource(R.string.new_subfolder) else stringResource(R.string.new_folder),
@@ -390,7 +338,6 @@ fun FoldersScreen(
         )
     }
 
-    // DIÁLOGO PARA EDITAR CARPETA
     folderToEdit?.let { folder ->
         FolderDialog(
             title = stringResource(R.string.edit_folder),
@@ -407,10 +354,11 @@ fun FoldersScreen(
         )
     }
 
-    // DIÁLOGO PARA CONFIRMAR ELIMINACIÓN DE CARPETA
     folderToDelete?.let { folder ->
-        DeleteFolderConfirmDialog(
-            folderName = folder.name,
+        ConfirmDestructiveDialog(
+            title = stringResource(R.string.delete_folder_title),
+            message = stringResource(R.string.delete_folder_message, folder.name),
+            confirmLabel = stringResource(R.string.delete),
             onDismiss = { folderToDelete = null },
             onConfirm = {
                 onDeleteFolder(folder.id)
@@ -418,21 +366,70 @@ fun FoldersScreen(
             }
         )
     }
+}
 
-    // DIÁLOGO DE AJUSTES (SINCRONIZACIÓN Y CIFRADO)
-    if (showSettingsDialog) {
-        SettingsDialog(
-            isConfigured = isConfigured,
-            currentCredentials = getCredentials(),
-            syncState = syncState,
-            onDismiss = { showSettingsDialog = false },
-            onSaveNextcloud = onConfigureNextcloud,
-            onDisconnectNextcloud = onDisconnectNextcloud,
-            onTriggerSync = onTriggerSync,
-            lastSync = getLastSync(),
-            currentLanguage = currentLanguage,
-            onLanguageSelected = onLanguageSelected
-        )
+@Composable
+private fun GroupLabel(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = modifier.padding(start = 12.dp, bottom = 8.dp, top = 4.dp)
+    )
+}
+
+@Composable
+private fun RowDivider(start: androidx.compose.ui.unit.Dp) {
+    HorizontalDivider(
+        thickness = 0.5.dp,
+        color = MaterialTheme.colorScheme.outlineVariant,
+        modifier = Modifier.padding(start = start)
+    )
+}
+
+@Composable
+private fun GlobalSearchField(query: String, onQueryChange: (String) -> Unit, onSearch: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(46.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(start = 12.dp, end = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Rounded.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            BasicTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { onSearch() }),
+                modifier = Modifier.weight(1f),
+                decorationBox = { inner ->
+                    if (query.isEmpty()) {
+                        Text(
+                            text = stringResource(R.string.search_everywhere_hint),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
+                    }
+                    inner()
+                }
+            )
+            if (query.isNotEmpty()) {
+                IconButton(onClick = { onQueryChange("") }) {
+                    Icon(Icons.Rounded.Clear, contentDescription = stringResource(R.string.cd_clear_search), modifier = Modifier.size(18.dp))
+                }
+            }
+        }
     }
 }
 
@@ -458,31 +455,17 @@ private fun QuickAccessRow(
                 .background(iconTint.copy(alpha = 0.15f)),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = iconTint,
-                modifier = Modifier.size(18.dp)
-            )
+            Icon(imageVector = icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(18.dp))
         }
-
         Spacer(modifier = Modifier.width(14.dp))
-
         Text(
             text = title,
             style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f)
         )
-
-        Text(
-            text = count.toString(),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-
+        Text(text = count.toString(), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(modifier = Modifier.width(6.dp))
-
         Icon(
             imageVector = Icons.Rounded.ChevronRight,
             contentDescription = null,
@@ -509,58 +492,33 @@ private fun FolderRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(
-                start = (16 + indentationLevel * 18).dp,
-                top = 10.dp,
-                bottom = 10.dp,
-                end = 8.dp
-            ),
+            .padding(start = (16 + indentationLevel * 18).dp, top = 8.dp, bottom = 8.dp, end = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            imageVector = Icons.Rounded.Folder,
-            contentDescription = null,
-            tint = tint,
-            modifier = Modifier.size(24.dp)
-        )
-
-        Spacer(modifier = Modifier.width(12.dp))
-
+        Icon(imageVector = Icons.Rounded.Folder, contentDescription = null, tint = tint, modifier = Modifier.size(26.dp))
+        Spacer(modifier = Modifier.width(16.dp))
         Text(
             text = name,
             style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
             color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f)
         )
-
-        Text(
-            text = count.toString(),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-
+        Text(text = count.toString(), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Box {
-            IconButton(
-                onClick = { showMenu = true },
-                modifier = Modifier.size(36.dp)
-            ) {
+            IconButton(onClick = { showMenu = true }) {
                 Icon(
                     imageVector = Icons.Rounded.MoreVert,
                     contentDescription = stringResource(R.string.cd_options),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(20.dp)
                 )
             }
-
-            DropdownMenu(
-                expanded = showMenu,
-                onDismissRequest = { showMenu = false }
-            ) {
+            DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.new_subfolder)) },
-                    leadingIcon = {
-                        Icon(Icons.Rounded.CreateNewFolder, contentDescription = null, modifier = Modifier.size(18.dp))
-                    },
+                    leadingIcon = { Icon(Icons.Rounded.CreateNewFolder, contentDescription = null, modifier = Modifier.size(18.dp)) },
                     onClick = {
                         showMenu = false
                         onAddSubfolder()
@@ -568,9 +526,7 @@ private fun FolderRow(
                 )
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.edit_folder)) },
-                    leadingIcon = {
-                        Icon(Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
-                    },
+                    leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.size(18.dp)) },
                     onClick = {
                         showMenu = false
                         onEdit()
@@ -578,9 +534,7 @@ private fun FolderRow(
                 )
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.delete_folder), color = MaterialTheme.colorScheme.error) },
-                    leadingIcon = {
-                        Icon(Icons.Rounded.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
-                    },
+                    leadingIcon = { Icon(Icons.Rounded.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp)) },
                     onClick = {
                         showMenu = false
                         onDelete()
@@ -601,14 +555,11 @@ private fun SyncStatusIconButton(
     val angle by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
+        animationSpec = infiniteRepeatable(animation = tween(1200, easing = LinearEasing), repeatMode = RepeatMode.Restart),
         label = "angle"
     )
 
-    val (icon, tint, isRotating, tooltip) = if (!isConfigured) {
+    val data = if (!isConfigured) {
         SyncIconData(Icons.Rounded.CloudOff, MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), false, stringResource(R.string.sync_configure))
     } else {
         when (syncState) {
@@ -621,12 +572,12 @@ private fun SyncStatusIconButton(
 
     IconButton(onClick = onClick) {
         Icon(
-            imageVector = icon,
-            contentDescription = tooltip,
-            tint = tint,
+            imageVector = data.icon,
+            contentDescription = data.description,
+            tint = data.tint,
             modifier = Modifier
                 .size(22.dp)
-                .rotate(if (isRotating) angle else 0f)
+                .rotate(if (data.isRotating) angle else 0f)
         )
     }
 }
@@ -635,15 +586,15 @@ private data class SyncIconData(
     val icon: ImageVector,
     val tint: Color,
     val isRotating: Boolean,
-    val tooltip: String
+    val description: String
 )
 
 @Composable
 private fun FolderDialog(
     title: String,
-    initialName: String = "",
-    initialColor: NoteColor = NoteColor.DEFAULT,
-    initialParentId: String? = null,
+    initialName: String,
+    initialColor: NoteColor,
+    initialParentId: String?,
     existingFolders: List<FolderEntity>,
     currentFolderId: String? = null,
     onDismiss: () -> Unit,
@@ -652,27 +603,29 @@ private fun FolderDialog(
     var folderName by remember { mutableStateOf(initialName) }
     var selectedColor by remember { mutableStateOf(initialColor) }
     var selectedParentId by remember { mutableStateOf(initialParentId) }
-    val isDark = isSystemInDarkTheme()
+    var showParentPicker by remember { mutableStateOf(false) }
+    val nameFocus = remember { FocusRequester() }
 
-    // Filtrar carpetas elegibles como padre (evitar auto-paternidad)
-    val eligibleParents = existingFolders.filter { it.id != currentFolderId }
+    // Una carpeta no puede moverse dentro de sí misma ni de sus subcarpetas (crearía un ciclo).
+    val excluded = remember(existingFolders, currentFolderId) {
+        currentFolderId?.let { FolderTree.descendantIds(existingFolders, it) + it }.orEmpty()
+    }
+    val parentName = existingFolders.firstOrNull { it.id == selectedParentId }?.name
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onSurface
-            )
-        },
+        title = { Text(text = title, fontWeight = FontWeight.Bold) },
         text = {
-            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+            Column {
                 OutlinedTextField(
                     value = folderName,
-                    onValueChange = { folderName = it },
+                    onValueChange = { folderName = it.replace("\n", "") },
                     placeholder = { Text(stringResource(R.string.folder_name_hint)) },
                     singleLine = true,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = {
+                        if (folderName.isNotBlank()) onConfirm(folderName, selectedColor, selectedParentId)
+                    }),
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
@@ -680,97 +633,55 @@ private fun FolderDialog(
                         focusedBorderColor = Color.Transparent,
                         unfocusedBorderColor = Color.Transparent
                     ),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(nameFocus)
                 )
+                // Al crear una carpeta el teclado aparece directamente en el nombre.
+                androidx.compose.runtime.LaunchedEffect(Unit) {
+                    if (initialName.isEmpty()) {
+                        kotlinx.coroutines.delay(120)
+                        runCatching { nameFocus.requestFocus() }
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(16.dp))
-
                 Text(
                     text = stringResource(R.string.folder_color),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-
                 Spacer(modifier = Modifier.height(8.dp))
+                ColorPalette(selected = selectedColor, onSelect = { selectedColor = it }, swatchSize = 30.dp)
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    NoteColor.entries.forEach { noteColor ->
-                        val color = noteColor.getAccentColor(isDark)
-                        val isSelected = selectedColor == noteColor
-
-                        Box(
-                            modifier = Modifier
-                                .size(32.dp)
-                                .clip(CircleShape)
-                                .background(color)
-                                .clickable { selectedColor = noteColor }
-                                .padding(2.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (isSelected) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(10.dp)
-                                        .clip(CircleShape)
-                                        .background(Color.White)
-                                )
-                            }
-                        }
-                    }
-                }
-
-                if (eligibleParents.isNotEmpty()) {
+                if (existingFolders.any { it.id !in excluded }) {
                     Spacer(modifier = Modifier.height(16.dp))
-
                     Text(
                         text = stringResource(R.string.parent_folder),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-
                     Spacer(modifier = Modifier.height(6.dp))
-
                     Surface(
                         shape = RoundedCornerShape(12.dp),
                         color = MaterialTheme.colorScheme.surfaceVariant,
+                        onClick = { showParentPicker = true },
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Column(modifier = Modifier.padding(8.dp)) {
-                            // Opción Ninguna (Carpeta raíz)
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { selectedParentId = null }
-                                    .padding(vertical = 6.dp, horizontal = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = stringResource(R.string.parent_none),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = if (selectedParentId == null) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (selectedParentId == null) (if (isDark) RoyalBlueDark else RoyalBlueLight) else MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-
-                            eligibleParents.forEach { parent ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable { selectedParentId = parent.id }
-                                        .padding(vertical = 6.dp, horizontal = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "↳ ${parent.name}",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = if (selectedParentId == parent.id) FontWeight.Bold else FontWeight.Normal,
-                                        color = if (selectedParentId == parent.id) (if (isDark) RoyalBlueDark else RoyalBlueLight) else MaterialTheme.colorScheme.onSurface
-                                    )
-                                }
-                            }
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Rounded.Folder, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = parentName ?: stringResource(R.string.parent_none),
+                                style = MaterialTheme.typography.bodyMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
@@ -778,70 +689,32 @@ private fun FolderDialog(
         },
         confirmButton = {
             TextButton(
-                onClick = {
-                    if (folderName.isNotBlank()) {
-                        onConfirm(folderName, selectedColor, selectedParentId)
-                    }
-                },
+                onClick = { onConfirm(folderName, selectedColor, selectedParentId) },
                 enabled = folderName.isNotBlank()
             ) {
-                Text(
-                    text = stringResource(R.string.save),
-                    fontWeight = FontWeight.Bold,
-                    color = if (isDark) RoyalBlueDark else RoyalBlueLight
-                )
+                Text(text = stringResource(R.string.save), fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(
-                    text = stringResource(R.string.cancel),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Text(text = stringResource(R.string.cancel), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         },
-        containerColor = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(16.dp)
+        shape = RoundedCornerShape(20.dp)
     )
-}
 
-@Composable
-private fun DeleteFolderConfirmDialog(
-    folderName: String,
-    onDismiss: () -> Unit,
-    onConfirm: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                text = stringResource(R.string.delete_folder_title),
-                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onSurface
-            )
-        },
-        text = {
-            Text(
-                text = stringResource(R.string.delete_folder_message, folderName),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        },
-        confirmButton = {
-            Button(
-                onClick = onConfirm,
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                shape = RoundedCornerShape(10.dp)
-            ) {
-                Text(stringResource(R.string.delete), color = Color.White)
+    if (showParentPicker) {
+        FolderPickerDialog(
+            title = stringResource(R.string.parent_folder),
+            folders = existingFolders,
+            selectedId = selectedParentId,
+            excludedIds = excluded,
+            noneLabel = stringResource(R.string.parent_none),
+            onDismiss = { showParentPicker = false },
+            onSelect = {
+                selectedParentId = it
+                showParentPicker = false
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.cancel), color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        },
-        containerColor = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(16.dp)
-    )
+        )
+    }
 }

@@ -4,7 +4,6 @@
 
 package com.ferlagod.misnotas.ui.theme
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
@@ -98,7 +97,7 @@ fun NoteColor.getAccentColor(isDark: Boolean): Color = when (this) {
  * Para el resto, combina el color de acento al 12% en claro y 18% en oscuro sobre la superficie base.
  */
 @Composable
-fun NoteColor.toCardBackground(isDark: Boolean = isSystemInDarkTheme()): Color {
+fun NoteColor.toCardBackground(isDark: Boolean = isAppInDarkTheme()): Color {
     val surfaceBase = if (isDark) SurfaceDark else SurfaceLight
     if (this == NoteColor.DEFAULT) return surfaceBase
     val accent = getAccentColor(isDark)
@@ -112,7 +111,7 @@ fun NoteColor.toCardBackground(isDark: Boolean = isSystemInDarkTheme()): Color {
  * Para notas con color, devuelve el acento al 35% de opacidad.
  */
 @Composable
-fun NoteColor.toCardBorder(isDark: Boolean = isSystemInDarkTheme()): Color {
+fun NoteColor.toCardBorder(isDark: Boolean = isAppInDarkTheme()): Color {
     if (this == NoteColor.DEFAULT) {
         return if (isDark) OutlineDark else OutlineLight
     }
@@ -126,7 +125,7 @@ fun NoteColor.toCardBorder(isDark: Boolean = isSystemInDarkTheme()): Color {
  * Para colores con acento, aplica un tinte muy sutil (6% en claro, 9% en oscuro) sobre el fondo base.
  */
 @Composable
-fun NoteColor.toEditorBackground(isDark: Boolean = isSystemInDarkTheme()): Color {
+fun NoteColor.toEditorBackground(isDark: Boolean = isAppInDarkTheme()): Color {
     val bgBase = if (isDark) BackgroundDark else BackgroundLight
     if (this == NoteColor.DEFAULT) return bgBase
     val accent = getAccentColor(isDark)

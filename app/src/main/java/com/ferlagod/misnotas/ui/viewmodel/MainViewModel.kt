@@ -7,36 +7,49 @@ package com.ferlagod.misnotas.ui.viewmodel
 import android.app.Application
 import android.net.Uri
 import androidx.annotation.StringRes
-import com.ferlagod.misnotas.R
-import com.ferlagod.misnotas.util.LanguageManager
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.room.withTransaction
+import com.ferlagod.misnotas.R
 import com.ferlagod.misnotas.data.attachment.AttachmentStore
+import com.ferlagod.misnotas.data.backup.BackupManager
 import com.ferlagod.misnotas.data.local.AppDatabase
 import com.ferlagod.misnotas.data.local.entity.AttachmentEntity
 import com.ferlagod.misnotas.data.local.entity.FolderEntity
 import com.ferlagod.misnotas.data.local.entity.NoteEntity
+import com.ferlagod.misnotas.data.local.model.FolderTree
 import com.ferlagod.misnotas.data.local.model.SyncStatus
+import com.ferlagod.misnotas.data.local.pref.AppSettings
+import com.ferlagod.misnotas.data.local.pref.AppSettingsState
 import com.ferlagod.misnotas.data.local.pref.NextcloudCredentials
+import com.ferlagod.misnotas.data.local.pref.SortOrder
+import com.ferlagod.misnotas.data.local.pref.ThemeMode
 import com.ferlagod.misnotas.data.sync.SyncRepository
 import com.ferlagod.misnotas.data.sync.SyncState
 import com.ferlagod.misnotas.data.sync.SyncWorker
 import com.ferlagod.misnotas.ui.theme.NoteColor
 import com.ferlagod.misnotas.util.ImageCompressor
+import com.ferlagod.misnotas.util.LanguageManager
+import com.ferlagod.misnotas.util.TextSearch
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.UUID
+import java.util.concurrent.TimeUnit
 
 /**
  * Filtro de navegación para la vista de notas.
@@ -48,8 +61,21 @@ sealed interface NotesFilter {
     data class Folder(val folderId: String, val folderName: String) : NotesFilter
 }
 
+/** Avisos puntuales para la interfaz (snackbars). */
+sealed interface UiEvent {
+    /** Se movieron notas a la papelera: la interfaz ofrece "Deshacer". */
+    data class NotesTrashed(val ids: List<String>) : UiEvent
+    data class Message(val text: String) : UiEvent
+}
+
+/** Navegación pedida desde fuera de la interfaz (accesos directos, compartir desde otra app). */
+sealed interface PendingNavigation {
+    data object NewNote : PendingNavigation
+    data class OpenNote(val noteId: String) : PendingNavigation
+}
+
 /**
- * ViewModel principal: sesión/cifrado, sincronización, carpetas y notas.
+ * ViewModel principal: sesión/cifrado, sincronización, ajustes, carpetas y notas.
  */
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -58,14 +84,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val noteDao = database.noteDao()
     private val attachmentDao = database.attachmentDao()
     private val attachmentStore = AttachmentStore(application)
+    private val backupManager = BackupManager(application)
 
     private val syncRepository = SyncRepository.getInstance(application)
     private val authPreferences = syncRepository.authPreferences
+    private val appSettings = AppSettings.getInstance(application)
 
     val syncState: StateFlow<SyncState> = syncRepository.syncState
+    val settings: StateFlow<AppSettingsState> = appSettings.state
 
     /** Serializa las escrituras de notas (p. ej. autoguardado seguido de "mover a papelera"). */
     private val noteWriteMutex = Mutex()
+
+    private val _events = Channel<UiEvent>(Channel.BUFFERED)
+    val events: Flow<UiEvent> = _events.receiveAsFlow()
+
+    private val _pendingNavigation = MutableStateFlow<PendingNavigation?>(null)
+    val pendingNavigation: StateFlow<PendingNavigation?> = _pendingNavigation.asStateFlow()
 
     private val _isConfigured = MutableStateFlow(authPreferences.hasCredentials())
     val isConfigured: StateFlow<Boolean> = _isConfigured.asStateFlow()
@@ -81,8 +116,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
-    private val _isGridLayout = MutableStateFlow(true)
-    val isGridLayout: StateFlow<Boolean> = _isGridLayout.asStateFlow()
+    private val _busy = MutableStateFlow(false)
+    /** Hay una importación/exportación en curso. */
+    val busy: StateFlow<Boolean> = _busy.asStateFlow()
 
     val allActiveNotes = noteDao.getAllNotesFlow().stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList()
@@ -100,26 +136,31 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         .map { list -> list.associateBy { it.id } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
+    /** Índice de búsqueda (texto normalizado sin acentos), recalculado solo cuando cambian las notas. */
+    private val searchIndex = combine(allActiveNotes, trashNotes) { active, trash ->
+        (active + trash).associate { it.id to TextSearch.normalize(it.title + "\n" + it.content) }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
     val displayedNotes: StateFlow<List<NoteEntity>> = combine(
-        allActiveNotes,
-        trashNotes,
+        combine(allActiveNotes, trashNotes, ::Pair),
         _currentFilter,
-        _searchQuery
-    ) { activeNotes, trashList, filter, query ->
+        _searchQuery,
+        settings.map { it.sortOrder }.distinctUntilChanged(),
+        searchIndex
+    ) { (activeNotes, trashList), filter, query, sortOrder, index ->
         val filtered = when (filter) {
             is NotesFilter.All -> activeNotes
             is NotesFilter.Pinned -> activeNotes.filter { it.isPinned }
             is NotesFilter.Trash -> trashList
             is NotesFilter.Folder -> activeNotes.filter { it.folderId == filter.folderId }
         }
-        if (query.isBlank()) {
-            filtered
-        } else {
-            val q = query.trim()
-            filtered.filter {
-                it.title.contains(q, ignoreCase = true) || it.content.contains(q, ignoreCase = true)
-            }
+        val terms = TextSearch.terms(query)
+        val matching = if (terms.isEmpty()) filtered else filtered.filter { note ->
+            val haystack = index[note.id] ?: TextSearch.normalize(note.title + "\n" + note.content)
+            terms.all { haystack.contains(it) }
         }
+        if (filter is NotesFilter.Trash) matching.sortedByDescending { it.updatedAt }
+        else matching.sortedWith(compareByDescending<NoteEntity> { it.isPinned }.then(sortOrder.comparator()))
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val totalActiveNotesCount = allActiveNotes.map { it.size }
@@ -131,15 +172,47 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val trashNotesCount = trashNotes.map { it.size }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
-    private fun text(@StringRes id: Int): String =
-        LanguageManager.localizedContext(getApplication()).getString(id)
+    private fun text(@StringRes id: Int, vararg args: Any): String =
+        LanguageManager.localizedContext(getApplication()).getString(id, *args)
+
+    private fun quantity(id: Int, count: Int): String =
+        LanguageManager.localizedContext(getApplication()).resources.getQuantityString(id, count, count)
 
     init {
-        viewModelScope.launch { syncRepository.migrateLegacyImages() }
+        viewModelScope.launch {
+            syncRepository.migrateLegacyImages()
+            purgeOldTrash()
+        }
         if (_isConfigured.value && _isUnlocked.value) {
             SyncWorker.schedule(application)
             triggerSync()
         }
+    }
+
+    // ==========================================
+    // Ajustes
+    // ==========================================
+
+    fun toggleLayoutMode() = appSettings.setGridLayout(!settings.value.gridLayout)
+    fun setSortOrder(order: SortOrder) = appSettings.setSortOrder(order)
+    fun setThemeMode(mode: ThemeMode) = appSettings.setThemeMode(mode)
+    fun setAppLock(enabled: Boolean) = appSettings.setAppLock(enabled)
+
+    fun setAutoPurgeTrash(enabled: Boolean) {
+        appSettings.setAutoPurgeTrash(enabled)
+        if (enabled) viewModelScope.launch { purgeOldTrash() }
+    }
+
+    /** Vacía de la papelera las notas que llevan más de 30 días en ella (si está activado). */
+    private suspend fun purgeOldTrash() {
+        if (!settings.value.autoPurgeTrash) return
+        val before = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(AppSettings.TRASH_RETENTION_DAYS.toLong())
+        val ids = noteDao.getTrashIdsOlderThan(before)
+        if (ids.isEmpty()) return
+        noteWriteMutex.withLock {
+            database.withTransaction { ids.forEach { purgeLocked(it) } }
+        }
+        triggerSync()
     }
 
     // ==========================================
@@ -159,7 +232,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         val url = serverUrl.trim()
-        if (!url.startsWith("https://")) {
+        if (!url.startsWith("https://", ignoreCase = true)) {
             onError(text(R.string.err_https_required))
             return
         }
@@ -190,6 +263,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 SyncWorker.schedule(getApplication())
                 triggerSync()
                 onSuccess()
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 onError(syncRepository.friendlyMessage(e))
             }
@@ -225,15 +300,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun getLastSync(): Long? = authPreferences.getLastSync()
 
-    fun configureNextcloud(
-        serverUrl: String,
-        username: String,
-        appPassword: String,
-        masterPassword: String,
-        onSuccess: () -> Unit,
-        onError: (String) -> Unit
-    ) = setupAndUnlock(serverUrl, username, appPassword, masterPassword, onSuccess, onError)
-
     // ==========================================
     // Sincronización
     // ==========================================
@@ -249,14 +315,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setFilter(filter: NotesFilter) {
         _currentFilter.value = filter
+        _searchQuery.value = ""
     }
 
     fun setSearchQuery(query: String) {
         _searchQuery.value = query
     }
 
-    fun toggleLayoutMode() {
-        _isGridLayout.value = !_isGridLayout.value
+    fun requestNavigation(navigation: PendingNavigation) {
+        _pendingNavigation.value = navigation
+    }
+
+    fun consumeNavigation() {
+        _pendingNavigation.value = null
     }
 
     // ==========================================
@@ -282,9 +353,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun updateFolder(id: String, name: String, color: NoteColor, parentId: String? = null) {
         if (name.isBlank()) return
-        // Evita ciclos: una carpeta no puede colgar de sí misma.
-        val safeParent = parentId?.takeIf { it != id }
         viewModelScope.launch {
+            // Evita ciclos: una carpeta no puede colgar de sí misma ni de una de sus subcarpetas.
+            val folders = folderDao.getAll().filter { !it.isDeleted }
+            val safeParent = parentId?.takeUnless { FolderTree.wouldCreateCycle(folders, id, it) }
             folderDao.updateFolderDetails(id, name.trim(), color.key, safeParent)
             triggerSync()
         }
@@ -302,6 +374,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (_isConfigured.value) folderDao.markAsDeleted(folderId)
                 else folderDao.deletePermanently(folderId)
             }
+            if (_currentFilter.value.let { it is NotesFilter.Folder && it.folderId == folderId }) {
+                _currentFilter.value = NotesFilter.All
+            }
             triggerSync()
         }
     }
@@ -315,6 +390,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * altera su fecha ni provoca subidas). Conserva el estado remoto y de papelera existentes.
      *
      * @param sync si es false solo guarda en local (autoguardado mientras se escribe).
+     * @param closing true al salir del editor: una nota que se ha quedado vacía se descarta.
      */
     fun saveNote(
         id: String,
@@ -323,10 +399,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         folderId: String? = null,
         color: NoteColor = NoteColor.DEFAULT,
         isPinned: Boolean = false,
-        sync: Boolean = true
+        sync: Boolean = true,
+        closing: Boolean = false
     ) {
         viewModelScope.launch {
-            noteWriteMutex.withLock { saveNoteLocked(id, title, content, folderId, color, isPinned, sync) }
+            noteWriteMutex.withLock { saveNoteLocked(id, title, content, folderId, color, isPinned, closing) }
+            if (sync) triggerSync()
         }
     }
 
@@ -337,37 +415,105 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         folderId: String?,
         color: NoteColor,
         isPinned: Boolean,
-        sync: Boolean
+        closing: Boolean
     ) {
-        run {
-            val existing = noteDao.getNoteById(id)
-            if (existing == null && title.isBlank() && content.isBlank()) return
+        val existing = noteDao.getNoteById(id)
+        val cleanTitle = title.trim()
+        val cleanContent = content.trimEnd()
 
-            val cleanTitle = title.trim()
-            val cleanContent = content.trimEnd()
-            if (existing != null &&
-                existing.title == cleanTitle &&
-                existing.content == cleanContent &&
-                existing.folderId == folderId &&
-                existing.color == color.key &&
-                existing.isPinned == isPinned
-            ) {
-                if (sync) triggerSync()
-                return
+        if (cleanTitle.isEmpty() && cleanContent.isBlank()) {
+            // Como en Keep o Apple Notas: una nota vacía no se guarda. Si antes tenía contenido
+            // (el autoguardado no guarda vacíos, así que sigue en la base de datos) va a la
+            // papelera con opción de deshacer, por si se borró todo sin querer.
+            if (existing != null && closing && !existing.isDeleted) {
+                if (existing.title.isBlank() && existing.content.isBlank()) {
+                    purgeLocked(id)
+                } else {
+                    noteDao.moveToTrash(id)
+                    _events.trySend(UiEvent.NotesTrashed(listOf(id)))
+                }
             }
-
-            val entity = (existing ?: NoteEntity(id = id, title = "", content = "")).copy(
-                folderId = folderId,
-                title = cleanTitle,
-                content = cleanContent,
-                isPinned = isPinned,
-                color = color.key,
-                updatedAt = System.currentTimeMillis(),
-                syncStatus = if (existing?.syncStatus == SyncStatus.PENDING_DELETE) SyncStatus.PENDING_DELETE else SyncStatus.PENDING_UPLOAD
-            )
-            noteDao.upsertNote(entity)
-            if (sync) triggerSync()
+            return
         }
+
+        if (existing != null &&
+            existing.title == cleanTitle &&
+            existing.content == cleanContent &&
+            existing.folderId == folderId &&
+            existing.color == color.key &&
+            existing.isPinned == isPinned
+        ) return
+
+        val entity = (existing ?: NoteEntity(id = id, title = "", content = "")).copy(
+            folderId = folderId,
+            title = cleanTitle,
+            content = cleanContent,
+            isPinned = isPinned,
+            color = color.key,
+            updatedAt = System.currentTimeMillis(),
+            syncStatus = if (existing?.syncStatus == SyncStatus.PENDING_DELETE) SyncStatus.PENDING_DELETE else SyncStatus.PENDING_UPLOAD
+        )
+        noteDao.upsertNote(entity)
+    }
+
+    /** Borrado definitivo (con lápida en el servidor si hay cuenta). Requiere el cerrojo de escritura. */
+    private suspend fun purgeLocked(id: String) {
+        if (_isConfigured.value) noteDao.markForPurge(id) else noteDao.deletePermanently(id)
+    }
+
+    /** Crea una nota nueva (p. ej. con texto compartido desde otra app) y devuelve su id. */
+    suspend fun createNote(title: String, content: String, folderId: String? = null): String {
+        val note = NoteEntity(
+            title = title.trim(),
+            content = content.trimEnd(),
+            folderId = folderId,
+            syncStatus = SyncStatus.PENDING_UPLOAD
+        )
+        noteWriteMutex.withLock { noteDao.upsertNote(note) }
+        triggerSync()
+        return note.id
+    }
+
+    /** Crea una nota a partir de contenido compartido y la abre. */
+    fun createNoteFromShare(subject: String?, sharedText: String?, imageUris: List<Uri>) {
+        viewModelScope.launch {
+            val images = imageUris.mapNotNull { uri ->
+                try {
+                    "![${text(R.string.image_alt)}](${addImageAttachment(uri)})"
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    null
+                }
+            }
+            val body = listOfNotNull(sharedText?.trim()?.takeIf { it.isNotEmpty() }, images.joinToString("\n").ifEmpty { null })
+                .joinToString("\n\n")
+            if (body.isBlank() && subject.isNullOrBlank()) {
+                if (imageUris.isNotEmpty()) _events.trySend(UiEvent.Message(text(R.string.image_add_failed)))
+                return@launch
+            }
+            val id = createNote(subject.orEmpty(), body)
+            requestNavigation(PendingNavigation.OpenNote(id))
+        }
+    }
+
+    /** Duplica una nota y devuelve el id de la copia. */
+    suspend fun duplicateNote(noteId: String): String? {
+        // Dentro del cerrojo: así se copia también el último autoguardado pendiente.
+        val copy = noteWriteMutex.withLock {
+            val original = noteDao.getNoteById(noteId) ?: return null
+            original.copy(
+                id = UUID.randomUUID().toString(),
+                title = (original.title.ifBlank { text(R.string.untitled) } + " " + text(R.string.copy_suffix)).trim(),
+                isPinned = false,
+                isDeleted = false,
+                updatedAt = System.currentTimeMillis(),
+                syncStatus = SyncStatus.PENDING_UPLOAD,
+                remoteEtag = null
+            ).also { noteDao.upsertNote(it) }
+        }
+        triggerSync()
+        return copy.id
     }
 
     fun togglePin(note: NoteEntity) {
@@ -380,19 +526,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /** Mueve la nota a la papelera. */
-    fun deleteNote(noteId: String) {
+    fun deleteNote(noteId: String) = moveNotesToTrash(listOf(noteId))
+
+    /** Mueve varias notas a la papelera y ofrece deshacer. */
+    fun moveNotesToTrash(ids: Collection<String>) {
+        if (ids.isEmpty()) return
         viewModelScope.launch {
             noteWriteMutex.withLock {
-                noteDao.moveToTrash(noteId)
+                database.withTransaction { ids.forEach { noteDao.moveToTrash(it) } }
             }
+            _events.trySend(UiEvent.NotesTrashed(ids.toList()))
             triggerSync()
         }
     }
 
-    fun restoreNote(noteId: String) {
+    fun restoreNote(noteId: String) = restoreNotes(listOf(noteId))
+
+    fun restoreNotes(ids: Collection<String>) {
+        if (ids.isEmpty()) return
         viewModelScope.launch {
             noteWriteMutex.withLock {
-                noteDao.restoreFromTrash(noteId)
+                database.withTransaction { ids.forEach { noteDao.restoreFromTrash(it) } }
             }
             triggerSync()
         }
@@ -407,11 +561,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun deleteNotePermanently(noteId: String) {
+    fun deleteNotePermanently(noteId: String) = deleteNotesPermanently(listOf(noteId))
+
+    fun deleteNotesPermanently(ids: Collection<String>) {
+        if (ids.isEmpty()) return
         viewModelScope.launch {
             noteWriteMutex.withLock {
-                if (_isConfigured.value) noteDao.markForPurge(noteId) else noteDao.deletePermanently(noteId)
+                database.withTransaction { ids.forEach { purgeLocked(it) } }
             }
+            triggerSync()
+        }
+    }
+
+    fun setNotesPinned(ids: Collection<String>, pinned: Boolean) = bulkUpdate { noteDao.setPinnedMany(ids.toList(), pinned) }
+
+    fun setNotesColor(ids: Collection<String>, color: NoteColor) = bulkUpdate { noteDao.setColor(ids.toList(), color.key) }
+
+    fun moveNotes(ids: Collection<String>, folderId: String?) = bulkUpdate { noteDao.moveToFolder(ids.toList(), folderId) }
+
+    private fun bulkUpdate(block: suspend () -> Unit) {
+        viewModelScope.launch {
+            noteWriteMutex.withLock { block() }
             triggerSync()
         }
     }
@@ -429,6 +599,51 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         )
         return AttachmentStore.reference(id)
     }
+
+    // ==========================================
+    // Copia de seguridad
+    // ==========================================
+
+    fun exportBackup(uri: Uri) = runBusy {
+        val count = backupManager.exportZip(uri, text(R.string.untitled))
+        _events.trySend(UiEvent.Message(quantity(R.plurals.export_done, count)))
+    }
+
+    fun importBackup(uris: List<Uri>) {
+        if (uris.isEmpty()) return
+        runBusy {
+            val result = backupManager.import(uris)
+            val message = if (result.notes == 0) text(R.string.import_nothing) else quantity(R.plurals.import_done, result.notes)
+            _events.trySend(UiEvent.Message(message))
+            if (result.notes > 0) triggerSync()
+        }
+    }
+
+    private fun runBusy(block: suspend () -> Unit) {
+        if (_busy.value) return
+        _busy.value = true
+        viewModelScope.launch {
+            try {
+                block()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _events.trySend(UiEvent.Message(text(R.string.backup_failed, e.localizedMessage ?: e.javaClass.simpleName)))
+            } finally {
+                _busy.value = false
+            }
+        }
+    }
+}
+
+/** Comparador de notas para cada criterio de orden. */
+fun SortOrder.comparator(): Comparator<NoteEntity> = when (this) {
+    SortOrder.MODIFIED_DESC -> compareByDescending { it.updatedAt }
+    SortOrder.MODIFIED_ASC -> compareBy { it.updatedAt }
+    SortOrder.TITLE_ASC -> compareBy<NoteEntity, String>(String.CASE_INSENSITIVE_ORDER) { it.title.ifBlank { it.content } }
+        .thenByDescending { it.updatedAt }
+    SortOrder.TITLE_DESC -> compareByDescending<NoteEntity, String>(String.CASE_INSENSITIVE_ORDER) { it.title.ifBlank { it.content } }
+        .thenByDescending { it.updatedAt }
 }
 
 class MainViewModelFactory(

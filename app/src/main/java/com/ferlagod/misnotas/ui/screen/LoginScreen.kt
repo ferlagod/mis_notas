@@ -8,7 +8,7 @@ import com.ferlagod.misnotas.R
 import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
+import com.ferlagod.misnotas.ui.theme.isAppInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -74,7 +74,7 @@ fun LoginScreen(
     onResetConfig: () -> Unit,
     onSkip: () -> Unit = {}
 ) {
-    val isDark = isSystemInDarkTheme()
+    val isDark = isAppInDarkTheme()
     val focusManager = LocalFocusManager.current
 
     var serverUrl by remember { mutableStateOf("https://") }
@@ -105,22 +105,11 @@ fun LoginScreen(
             verticalArrangement = Arrangement.Center
         ) {
             // Logotipo circular estilizado
-            Box(
-                modifier = Modifier
-                    .size(80.dp)
-                    .clip(CircleShape)
-                    .background(primaryBlue),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.CloudSync,
-                    contentDescription = stringResource(R.string.app_name),
-                    tint = Color.White,
-                    modifier = Modifier.size(44.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
+            androidx.compose.foundation.Image(
+                painter = androidx.compose.ui.res.painterResource(R.mipmap.ic_launcher_foreground),
+                contentDescription = null,
+                modifier = Modifier.size(132.dp)
+            )
 
             Text(
                 text = stringResource(R.string.app_name),

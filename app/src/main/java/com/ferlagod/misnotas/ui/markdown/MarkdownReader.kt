@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Checkbox
@@ -65,6 +66,7 @@ private sealed interface MdBlock {
     data class Numbered(val number: String, val text: String, val indent: Int) : MdBlock
     data class Code(val text: String) : MdBlock
     data class Image(val alt: String, val source: String) : MdBlock
+    data class Table(val header: List<String>, val rows: List<List<String>>) : MdBlock
     data object Rule : MdBlock
     data object Blank : MdBlock
 }
@@ -75,6 +77,10 @@ private val NUMBERED_REGEX = Regex("""^(\s*)(\d{1,9})[.)] (.*)$""")
 private val HEADING_REGEX = Regex("""^(#{1,6}) (.*)$""")
 private val IMAGE_REGEX = Regex("""^\s*!\[(.*?)]\((.*?)\)\s*$""")
 private val RULE_REGEX = Regex("""^\s*([-*_])(\s*\1){2,}\s*$""")
+private val TABLE_SEPARATOR = Regex("""^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$""")
+
+private fun tableCells(line: String): List<String> =
+    line.trim().removePrefix("|").removeSuffix("|").split('|').map { it.trim() }
 
 private fun parseBlocks(markdown: String): List<MdBlock> {
     val lines = markdown.lines()
@@ -94,6 +100,19 @@ private fun parseBlocks(markdown: String): List<MdBlock> {
                 blocks += MdBlock.Code(code.toString())
             }
             line.isBlank() -> blocks += MdBlock.Blank
+            line.contains('|') && i + 1 < lines.size && TABLE_SEPARATOR.matches(lines[i + 1]) -> {
+                val header = tableCells(line)
+                val rows = mutableListOf<List<String>>()
+                i += 2
+                while (i < lines.size && lines[i].contains('|') && lines[i].isNotBlank()) {
+                    rows += tableCells(lines[i]).let { cells ->
+                        List(header.size) { idx -> cells.getOrElse(idx) { "" } }
+                    }
+                    i++
+                }
+                i--
+                blocks += MdBlock.Table(header, rows)
+            }
             RULE_REGEX.matches(line) -> blocks += MdBlock.Rule
             HEADING_REGEX.matches(line) -> {
                 val m = HEADING_REGEX.find(line)!!
@@ -156,7 +175,8 @@ fun rememberImageModel(source: String): Any? {
 fun MarkdownReader(
     markdownText: String,
     primaryBlue: Color,
-    onToggleChecklist: (lineIndex: Int) -> Unit
+    onToggleChecklist: (lineIndex: Int) -> Unit,
+    onImageClick: ((Any) -> Unit)? = null
 ) {
     val blocks = remember(markdownText) { parseBlocks(markdownText) }
     val linkColor = primaryBlue
@@ -169,7 +189,8 @@ fun MarkdownReader(
                     style = when (block.level) {
                         1 -> MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = (-0.5).sp)
                         2 -> MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
-                        else -> MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
+                        3 -> MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
+                        else -> MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold)
                     },
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.padding(top = if (block.level == 1) 14.dp else 10.dp, bottom = 4.dp)
@@ -259,13 +280,14 @@ fun MarkdownReader(
                     if (model != null) {
                         AsyncImage(
                             model = model,
-                            contentDescription = block.alt.ifBlank { "Imagen" },
+                            contentDescription = block.alt.ifBlank { null },
                             contentScale = ContentScale.FillWidth,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .heightIn(max = 480.dp)
                                 .padding(vertical = 8.dp)
                                 .clip(RoundedCornerShape(12.dp))
+                                .then(if (onImageClick != null) Modifier.clickable { onImageClick(model) } else Modifier)
                         )
                     }
                 }
@@ -278,9 +300,45 @@ fun MarkdownReader(
                 )
 
                 MdBlock.Blank -> Spacer(modifier = Modifier.height(8.dp))
+
+                is MdBlock.Table -> MarkdownTable(block, linkColor)
             }
         }
     }
+}
+
+@Composable
+private fun MarkdownTable(table: MdBlock.Table, linkColor: Color) {
+    val border = MaterialTheme.colorScheme.outlineVariant
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = Color.Transparent,
+        border = androidx.compose.foundation.BorderStroke(1.dp, border),
+        modifier = Modifier.padding(vertical = 6.dp)
+    ) {
+        Row(modifier = Modifier.horizontalScroll(rememberScrollState())) {
+            table.header.indices.forEach { col ->
+                Column(modifier = Modifier.width(IntrinsicSize.Max)) {
+                    TableCell(table.header[col], linkColor, header = true)
+                    table.rows.forEach { row -> TableCell(row[col], linkColor, header = false) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TableCell(text: String, linkColor: Color, header: Boolean) {
+    Text(
+        text = inline(text, linkColor),
+        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = if (header) FontWeight.Bold else FontWeight.Normal),
+        color = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(if (header) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f) else Color.Transparent)
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .widthIn(max = 260.dp)
+    )
 }
 
 @Composable
@@ -302,7 +360,9 @@ private fun ListRow(marker: String, indent: Int, markerColor: Color, content: @C
     }
 }
 
-private val INLINE_REGEX = Regex("""(\*\*[^*]+\*\*|__[^_]+__|~~[^~]+~~|`[^`]+`|\[[^\]]+]\([^)\s]+\)|\*[^*\s][^*]*\*|_[^_\s][^_]*_)""")
+private val INLINE_REGEX = Regex(
+    """(\*\*[^*]+\*\*|(?<![\p{L}\p{N}])__[^_]+__(?![\p{L}\p{N}])|~~[^~]+~~|`[^`]+`|\[[^\]]+]\([^)\s]+\)|\*[^*\s][^*]*\*|(?<![\p{L}\p{N}_])_[^_\s][^_]*_(?![\p{L}\p{N}_])|https?://[^\s<>()\[\]]+[^\s<>()\[\].,;:!?'"])"""
+)
 
 /**
  * Formato en línea: **negrita**, *cursiva*, ~~tachado~~, `código` y [enlaces](https://…).
@@ -321,6 +381,13 @@ fun inline(text: String, linkColor: Color = Color.Unspecified): AnnotatedString 
                 withStyle(SpanStyle(fontFamily = FontFamily.Monospace, background = Color.Gray.copy(alpha = 0.15f))) {
                     append(token.removeSurrounding("`"))
                 }
+            token.startsWith("http://") || token.startsWith("https://") ->
+                withLink(
+                    LinkAnnotation.Url(
+                        token,
+                        TextLinkStyles(SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline))
+                    )
+                ) { append(token) }
             token.startsWith("[") -> {
                 val label = token.substring(1, token.indexOf("]("))
                 val url = token.substring(token.indexOf("](") + 2, token.length - 1)
@@ -343,10 +410,29 @@ fun inline(text: String, linkColor: Color = Color.Unspecified): AnnotatedString 
     if (cursor < text.length) append(text.substring(cursor))
 }
 
+/**
+ * Texto legible de una nota para compartir o copiar: sin sintaxis Markdown ni imágenes internas.
+ */
+fun markdownPlainText(markdown: String): String =
+    markdown.lineSequence()
+        .filterNot { IMAGE_REGEX.matches(it) && it.contains(AttachmentStore.SCHEME) }
+        .filterNot { it.trimStart().startsWith("```") || TABLE_SEPARATOR.matches(it) }
+        .map { line ->
+            line.replace(Regex("""^#{1,6} """), "")
+                .replace(Regex("""^(\s*)[-*+] \[(x|X)] """), "$1☑ ")
+                .replace(Regex("""^(\s*)[-*+] \[ ] """), "$1☐ ")
+                .replace(Regex("""^(\s*)[-*+] """), "$1• ")
+                .replace(Regex("""\*\*|~~|`"""), "")
+                .replace(Regex("""\[([^\]]+)]\(([^)]*)\)"""), "$1 ($2)")
+        }
+        .joinToString("\n")
+        .replace(Regex("\n{3,}"), "\n\n")
+        .trim()
+
 /** Texto plano aproximado de una nota, para vistas previas en tarjetas. */
 fun markdownPreview(markdown: String, maxLines: Int = 8): String =
     markdown.lineSequence()
-        .filterNot { it.isBlank() || IMAGE_REGEX.matches(it) || it.trimStart().startsWith("```") }
+        .filterNot { it.isBlank() || IMAGE_REGEX.matches(it) || it.trimStart().startsWith("```") || TABLE_SEPARATOR.matches(it) }
         .map { line ->
             line.replace(Regex("""^#{1,6} """), "")
                 .replace(Regex("""^(\s*)[-*+] \[(x|X)] """), "$1☑ ")

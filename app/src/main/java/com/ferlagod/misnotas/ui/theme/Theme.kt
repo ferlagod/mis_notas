@@ -10,7 +10,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
@@ -74,6 +77,14 @@ private val DarkColorScheme = darkColorScheme(
     onError = Color.White
 )
 
+/** Indica si la app está en modo oscuro (según el tema elegido en Ajustes, no solo el del sistema). */
+val LocalDarkTheme = staticCompositionLocalOf { false }
+
+/** Sustituto de `isSystemInDarkTheme()` que respeta el tema elegido por el usuario. */
+@Composable
+@ReadOnlyComposable
+fun isAppInDarkTheme(): Boolean = LocalDarkTheme.current
+
 @Composable
 fun MisNotasTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
@@ -93,9 +104,11 @@ fun MisNotasTheme(
         }
     }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content
-    )
+    CompositionLocalProvider(LocalDarkTheme provides darkTheme) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = Typography,
+            content = content
+        )
+    }
 }

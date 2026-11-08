@@ -48,6 +48,19 @@ interface NoteDao {
     @Query("UPDATE notes SET isPinned = :isPinned, updatedAt = :updatedAt, syncStatus = 'PENDING_UPLOAD' WHERE id = :id")
     suspend fun setPinned(id: String, isPinned: Boolean, updatedAt: Long = System.currentTimeMillis())
 
+    @Query("UPDATE notes SET isPinned = :isPinned, updatedAt = :updatedAt, syncStatus = 'PENDING_UPLOAD' WHERE id IN (:ids) AND isPinned != :isPinned AND syncStatus != 'PENDING_DELETE'")
+    suspend fun setPinnedMany(ids: List<String>, isPinned: Boolean, updatedAt: Long = System.currentTimeMillis())
+
+    @Query("UPDATE notes SET color = :color, updatedAt = :updatedAt, syncStatus = 'PENDING_UPLOAD' WHERE id IN (:ids) AND color != :color AND syncStatus != 'PENDING_DELETE'")
+    suspend fun setColor(ids: List<String>, color: String, updatedAt: Long = System.currentTimeMillis())
+
+    @Query("UPDATE notes SET folderId = :folderId, updatedAt = :updatedAt, syncStatus = 'PENDING_UPLOAD' WHERE id IN (:ids) AND (folderId IS NOT :folderId) AND syncStatus != 'PENDING_DELETE'")
+    suspend fun moveToFolder(ids: List<String>, folderId: String?, updatedAt: Long = System.currentTimeMillis())
+
+    /** Notas en la papelera desde antes de [before] (para el vaciado automático). */
+    @Query("SELECT id FROM notes WHERE isDeleted = 1 AND syncStatus != 'PENDING_DELETE' AND updatedAt < :before")
+    suspend fun getTrashIdsOlderThan(before: Long): List<String>
+
     /** Mueve la nota a la papelera (se sincroniza como nota en papelera). */
     @Query("UPDATE notes SET isDeleted = 1, syncStatus = 'PENDING_UPLOAD', updatedAt = :updatedAt WHERE id = :id")
     suspend fun moveToTrash(id: String, updatedAt: Long = System.currentTimeMillis())
