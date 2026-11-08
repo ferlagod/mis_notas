@@ -1,0 +1,21 @@
+<b>Mis Notas</b> es una app de notas libre para Android que combina el aspecto limpio de las apps de notas más conocidas con carpetas, Markdown y sincronización <b>cifrada de extremo a extremo</b> con tu propio servidor Nextcloud.
+
+<b>Sin publicidad ni seguimiento</b>
+Sin anuncios, sin telemetría, sin cuentas obligatorias y sin bibliotecas propietarias. Funciona sin conexión y sin cuenta: la sincronización es opcional. Código 100 % libre bajo licencia GNU GPLv3.
+
+<b>Tu nube, tus reglas</b>
+Las notas se cifran en el teléfono con AES-256-GCM antes de subirse a tu Nextcloud (WebDAV). El servidor solo guarda datos ilegibles. Si una nota se edita a la vez en dos dispositivos, se conservan ambas versiones.
+
+<b>Características principales:</b>
+• Carpetas anidadas con colores, notas fijadas y papelera con restauración.
+• Markdown: títulos, negrita, cursiva, tachado, listas, listas de tareas que se marcan con un toque, tablas, citas, código y enlaces.
+• Editor con deshacer y rehacer, listas que continúan solas y barra de formato.
+• Imágenes adjuntas con visor y zoom.
+• Selección múltiple para fijar, colorear, mover o borrar varias notas a la vez, con "Deshacer".
+• Búsqueda instantánea que ignora acentos y resalta los resultados.
+• Vista de cuadrícula o lista y orden por fecha o título.
+• Compartir notas y crear notas desde cualquier app.
+• Copia de seguridad en Markdown (ZIP con carpetas e imágenes) compatible con Obsidian, Joplin y otras apps.
+• Bloqueo con huella, cara o PIN.
+• Tema claro, oscuro o negro puro AMOLED.
+• Disponible en español, inglés, francés, alemán e italiano.

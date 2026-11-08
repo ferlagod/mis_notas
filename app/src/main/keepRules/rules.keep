@@ -1,3 +1,7 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 ferlagod
+# Mis Notas — https://github.com/ferlagod/mis_notas
+
 # Reglas R8 de Mis Notas.
 
 # Tink (usado por androidx.security:security-crypto) referencia anotaciones de Error Prone

@@ -1,0 +1,7 @@
+First public release.
+• Markdown notes with folders, colors, checklists, tables and images.
+• Optional end-to-end encrypted sync with Nextcloud.
+• Editor with undo, automatic lists and a formatting bar.
+• Multi-select, accent-insensitive search and "Undo".
+• Markdown backup, fingerprint lock and AMOLED theme.
+• In English, Spanish, French, German and Italian.

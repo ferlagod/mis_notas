@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  SPDX-License-Identifier: GPL-3.0-or-later
+  Copyright (C) 2026 ferlagod
+  Mis Notas — https://github.com/ferlagod/mis_notas
+-->
 <resources>
     <!-- Android 12+: pantalla de arranque con el color de la marca, como Mis Podcast. -->
     <style name="Theme.MisNotas" parent="android:Theme.Material.Light.NoActionBar">

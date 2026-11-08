@@ -1,0 +1,21 @@
+<b>Mis Notas</b> is a free and open-source note-taking app for Android. It combines the clean look of the best-known notes apps with folders, Markdown and <b>end-to-end encrypted</b> sync with your own Nextcloud server.
+
+<b>No ads, no tracking</b>
+No ads, no telemetry, no mandatory accounts and no proprietary libraries. It works offline and without an account: sync is optional. 100% free software under the GNU GPLv3.
+
+<b>Your cloud, your rules</b>
+Notes are encrypted on your phone with AES-256-GCM before being uploaded to your Nextcloud (WebDAV). The server only stores unreadable data. If a note is edited on two devices at once, both versions are kept.
+
+<b>Main features:</b>
+• Nested folders with colors, pinned notes and a trash you can restore from.
+• Markdown: headings, bold, italic, strikethrough, lists, checklists you tick with a tap, tables, quotes, code and links.
+• Editor with undo and redo, lists that continue automatically and a formatting bar.
+• Image attachments with a zoomable viewer.
+• Multi-select to pin, color, move or delete several notes at once, with "Undo".
+• Instant search that ignores accents and highlights matches.
+• Grid or list view, sorted by date or title.
+• Share notes and create notes from any app.
+• Markdown backup (ZIP with folders and images) compatible with Obsidian, Joplin and other apps.
+• App lock with fingerprint, face or PIN.
+• Light, dark or pure black AMOLED theme.
+• Available in English, Spanish, French, German and Italian.

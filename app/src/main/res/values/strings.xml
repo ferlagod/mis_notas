@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  SPDX-License-Identifier: GPL-3.0-or-later
+  Copyright (C) 2026 ferlagod
+  Mis Notas — https://github.com/ferlagod/mis_notas
+-->
 <!-- Generado: mantén las mismas claves en todos los idiomas. -->
 <resources>
     <string name="app_name" translatable="false">Mis Notas</string>

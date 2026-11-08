@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
+  SPDX-License-Identifier: GPL-3.0-or-later
+  Copyright (C) 2026 ferlagod
+  Mis Notas — https://github.com/ferlagod/mis_notas
+-->
+<!--
   Android 11 y anteriores: no se sube nada a la copia de seguridad en la nube de Google.
   La base de datos local guarda las notas sin cifrar y las preferencias dependen del Keystore
   del dispositivo. La copia de seguridad de Mis Notas es tu servidor Nextcloud (cifrada).

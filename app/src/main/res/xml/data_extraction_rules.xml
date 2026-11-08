@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
+  SPDX-License-Identifier: GPL-3.0-or-later
+  Copyright (C) 2026 ferlagod
+  Mis Notas — https://github.com/ferlagod/mis_notas
+-->
+<!--
   Android 12+:
   - Copia en la nube: desactivada (las notas locales no están cifradas).
   - Transferencia directa entre dispositivos (cable / Wi-Fi local): se copian notas y adjuntos,

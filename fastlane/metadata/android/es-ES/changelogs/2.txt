@@ -1,0 +1,7 @@
+Primera versión pública.
+• Notas en Markdown con carpetas, colores, tareas, tablas e imágenes.
+• Sincronización opcional cifrada de extremo a extremo con Nextcloud.
+• Editor con deshacer, listas automáticas y barra de formato.
+• Selección múltiple, búsqueda sin acentos y "Deshacer".
+• Copia de seguridad en Markdown, bloqueo con huella y tema AMOLED.
+• En español, inglés, francés, alemán e italiano.

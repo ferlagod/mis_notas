@@ -51,3 +51,19 @@ Para que el flujo firme el APK, añade estos *secrets* en **Settings → Secrets
 | `KEY_PASSWORD` | Contraseña de la clave |
 
 Sin esos *secrets*, el flujo publica un APK **sin firmar**, que Android no deja instalar.
+
+## Publicar en F-Droid
+
+El repositorio ya incluye lo que F-Droid necesita:
+
+- **Licencia**: GPL-3.0-or-later. El texto completo está en [LICENSE](LICENSE) y cada fichero de código y recursos lleva su cabecera `SPDX-License-Identifier`. La app muestra el aviso legal en **Ajustes → Acerca de**.
+- **Solo dependencias libres**: nada de Google Play Services, Firebase ni rastreadores. El bloque de dependencias cifrado de Google está desactivado (`dependenciesInfo`).
+- **Ficha de la tienda** en `fastlane/metadata/android/<idioma>/`: título, descripciones, icono, gráfico destacado y novedades por `versionCode` (`changelogs/<versionCode>.txt`). Las capturas van en `images/phoneScreenshots/` (1.png, 2.png…).
+- **Borrador de la receta** en [`fdroid/metadata/com.ferlagod.misnotas.yml`](fdroid/metadata/com.ferlagod.misnotas.yml).
+
+Pasos:
+
+1. Asegúrate de que la etiqueta `vX.Y.Z` apunta al commit que quieres publicar y súbela (`git push origin vX.Y.Z`).
+2. Añade `fastlane/metadata/android/*/changelogs/<versionCode>.txt` para cada versión nueva (máx. 500 caracteres).
+3. Haz un *fork* de [fdroiddata](https://gitlab.com/fdroid/fdroiddata), copia la receta en `metadata/com.ferlagod.misnotas.yml` y compruébala con `fdroid lint com.ferlagod.misnotas` y `fdroid build -v -l com.ferlagod.misnotas`.
+4. Abre un *merge request* en fdroiddata. Con `UpdateCheckMode: Tags`, las versiones siguientes se detectan solas al subir nuevas etiquetas.
