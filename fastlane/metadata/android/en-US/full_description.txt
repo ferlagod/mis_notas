@@ -17,5 +17,6 @@ Notes are encrypted on your phone with AES-256-GCM before being uploaded to your
 • Share notes and create notes from any app.
 • Markdown backup (ZIP with folders and images) compatible with Obsidian, Joplin and other apps.
 • App lock with fingerprint, face or PIN.
+• Designed for foldables and tablets, with the list and the note side by side.
 • Light, dark or pure black AMOLED theme.
 • Available in English, Spanish, French, German and Italian.

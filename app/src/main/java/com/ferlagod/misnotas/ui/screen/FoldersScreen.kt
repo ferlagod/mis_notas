@@ -4,6 +4,7 @@
 
 package com.ferlagod.misnotas.ui.screen
 
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -163,156 +164,161 @@ fun FoldersScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
-        LazyColumn(
-            state = listState,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 104.dp)
-        ) {
-            // Cabecera editorial común a la familia "Mis Apps" (como el inicio de Mis Podcast)
-            item(key = "header") {
-                HomeHeader(
-                    totalNotes = totalNotesCount,
-                    folderCount = folders.size,
-                    actions = {
-                        SyncStatusIconButton(
-                            isConfigured = isConfigured,
-                            syncState = syncState,
-                            onClick = { if (isConfigured) onTriggerSync() else onOpenSettings() }
-                        )
-                        if (isConfigured) {
-                            IconButton(onClick = onLockApp) {
-                                Icon(Icons.Rounded.Lock, contentDescription = stringResource(R.string.cd_lock), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        // En pantallas anchas el contenido se centra con un ancho cómodo; el desplazamiento
+        // sigue funcionando en toda la pantalla.
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val sidePadding = maxOf(16.dp, (maxWidth - READABLE_MAX_WIDTH) / 2)
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
+                contentPadding = PaddingValues(start = sidePadding, end = sidePadding, top = 4.dp, bottom = 104.dp)
+            ) {
+                // Cabecera editorial común a la familia "Mis Apps" (como el inicio de Mis Podcast)
+                item(key = "header") {
+                    HomeHeader(
+                        totalNotes = totalNotesCount,
+                        folderCount = folders.size,
+                        actions = {
+                            SyncStatusIconButton(
+                                isConfigured = isConfigured,
+                                syncState = syncState,
+                                onClick = { if (isConfigured) onTriggerSync() else onOpenSettings() }
+                            )
+                            if (isConfigured) {
+                                IconButton(onClick = onLockApp) {
+                                    Icon(Icons.Rounded.Lock, contentDescription = stringResource(R.string.cd_lock), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                            IconButton(onClick = onOpenSettings) {
+                                Icon(Icons.Rounded.Settings, contentDescription = stringResource(R.string.cd_settings), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
-                        IconButton(onClick = onOpenSettings) {
-                            Icon(Icons.Rounded.Settings, contentDescription = stringResource(R.string.cd_settings), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    )
+                }
+
+                item(key = "search") {
+                    GlobalSearchField(
+                        query = query,
+                        onQueryChange = { query = it },
+                        onSearch = {
+                            focusManager.clearFocus()
+                            onSearch(query.trim())
+                            query = ""
                         }
-                    }
-                )
-            }
-
-            item(key = "search") {
-                GlobalSearchField(
-                    query = query,
-                    onQueryChange = { query = it },
-                    onSearch = {
-                        focusManager.clearFocus()
-                        onSearch(query.trim())
-                        query = ""
-                    }
-                )
-                Spacer(modifier = Modifier.height(18.dp))
-            }
-
-            item(key = "quick") {
-                GroupLabel(stringResource(R.string.quick_views))
-                Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = MaterialTheme.colorScheme.surface,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column {
-                        QuickAccessRow(
-                            title = stringResource(R.string.all_notes),
-                            icon = Icons.AutoMirrored.Rounded.Note,
-                            iconTint = primary,
-                            count = totalNotesCount,
-                            onClick = { onSelectFilter(NotesFilter.All) }
-                        )
-                        RowDivider(start = 62.dp)
-                        QuickAccessRow(
-                            title = stringResource(R.string.pinned),
-                            icon = Icons.Rounded.PushPin,
-                            iconTint = AccentOrange,
-                            count = pinnedNotesCount,
-                            onClick = { onSelectFilter(NotesFilter.Pinned) }
-                        )
-                        RowDivider(start = 62.dp)
-                        QuickAccessRow(
-                            title = stringResource(R.string.trash),
-                            icon = Icons.Rounded.Delete,
-                            iconTint = AccentRed,
-                            count = trashNotesCount,
-                            onClick = { onSelectFilter(NotesFilter.Trash) }
-                        )
-                    }
+                    )
+                    Spacer(modifier = Modifier.height(18.dp))
                 }
-                Spacer(modifier = Modifier.height(24.dp))
-            }
 
-            item(key = "folders_header") {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    GroupLabel(stringResource(R.string.my_folders), modifier = Modifier.weight(1f))
-                    TextButton(onClick = {
-                        parentForNewFolder = null
-                        showCreateFolderDialog = true
-                    }) {
-                        Icon(Icons.Rounded.CreateNewFolder, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(stringResource(R.string.new_folder), fontWeight = FontWeight.SemiBold)
-                    }
-                }
-            }
-
-            if (tree.isEmpty()) {
-                item(key = "no_folders") {
+                item(key = "quick") {
+                    GroupLabel(stringResource(R.string.quick_views))
                     Surface(
                         shape = RoundedCornerShape(14.dp),
                         color = MaterialTheme.colorScheme.surface,
-                        onClick = {
-                            parentForNewFolder = null
-                            showCreateFolderDialog = true
-                        },
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Column(
-                            modifier = Modifier.padding(24.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Icon(Icons.Rounded.CreateNewFolder, contentDescription = null, tint = primary, modifier = Modifier.size(32.dp))
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = stringResource(R.string.no_folders),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                        Column {
+                            QuickAccessRow(
+                                title = stringResource(R.string.all_notes),
+                                icon = Icons.AutoMirrored.Rounded.Note,
+                                iconTint = primary,
+                                count = totalNotesCount,
+                                onClick = { onSelectFilter(NotesFilter.All) }
+                            )
+                            RowDivider(start = 62.dp)
+                            QuickAccessRow(
+                                title = stringResource(R.string.pinned),
+                                icon = Icons.Rounded.PushPin,
+                                iconTint = AccentOrange,
+                                count = pinnedNotesCount,
+                                onClick = { onSelectFilter(NotesFilter.Pinned) }
+                            )
+                            RowDivider(start = 62.dp)
+                            QuickAccessRow(
+                                title = stringResource(R.string.trash),
+                                icon = Icons.Rounded.Delete,
+                                iconTint = AccentRed,
+                                count = trashNotesCount,
+                                onClick = { onSelectFilter(NotesFilter.Trash) }
                             )
                         }
                     }
+                    Spacer(modifier = Modifier.height(24.dp))
                 }
-            } else {
-                itemsIndexed(tree, key = { _, (folder, _) -> folder.id }) { index, (folder, level) ->
-                    val shape = when {
-                        tree.size == 1 -> RoundedCornerShape(14.dp)
-                        index == 0 -> RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp)
-                        index == tree.lastIndex -> RoundedCornerShape(bottomStart = 14.dp, bottomEnd = 14.dp)
-                        else -> RoundedCornerShape(0.dp)
+
+                item(key = "folders_header") {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        GroupLabel(stringResource(R.string.my_folders), modifier = Modifier.weight(1f))
+                        TextButton(onClick = {
+                            parentForNewFolder = null
+                            showCreateFolderDialog = true
+                        }) {
+                            Icon(Icons.Rounded.CreateNewFolder, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(stringResource(R.string.new_folder), fontWeight = FontWeight.SemiBold)
+                        }
                     }
-                    Surface(
-                        shape = shape,
-                        color = MaterialTheme.colorScheme.surface,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .animateItem()
-                    ) {
-                        Column {
-                            FolderRow(
-                                name = folder.name,
-                                tint = NoteColor.fromKey(folder.color).let { c ->
-                                    if (c == NoteColor.DEFAULT) primary else c.getAccentColor(isDark)
-                                },
-                                count = countByFolder[folder.id] ?: 0,
-                                indentationLevel = level,
-                                onClick = { onSelectFilter(NotesFilter.Folder(folder.id, folder.name)) },
-                                onAddSubfolder = {
-                                    parentForNewFolder = folder.id
-                                    showCreateFolderDialog = true
-                                },
-                                onEdit = { folderToEdit = folder },
-                                onDelete = { folderToDelete = folder }
-                            )
-                            if (index < tree.lastIndex) RowDivider(start = (58 + level * 18).dp)
+                }
+
+                if (tree.isEmpty()) {
+                    item(key = "no_folders") {
+                        Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = MaterialTheme.colorScheme.surface,
+                            onClick = {
+                                parentForNewFolder = null
+                                showCreateFolderDialog = true
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(24.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Icon(Icons.Rounded.CreateNewFolder, contentDescription = null, tint = primary, modifier = Modifier.size(32.dp))
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = stringResource(R.string.no_folders),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    itemsIndexed(tree, key = { _, (folder, _) -> folder.id }) { index, (folder, level) ->
+                        val shape = when {
+                            tree.size == 1 -> RoundedCornerShape(14.dp)
+                            index == 0 -> RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp)
+                            index == tree.lastIndex -> RoundedCornerShape(bottomStart = 14.dp, bottomEnd = 14.dp)
+                            else -> RoundedCornerShape(0.dp)
+                        }
+                        Surface(
+                            shape = shape,
+                            color = MaterialTheme.colorScheme.surface,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .animateItem()
+                        ) {
+                            Column {
+                                FolderRow(
+                                    name = folder.name,
+                                    tint = NoteColor.fromKey(folder.color).let { c ->
+                                        if (c == NoteColor.DEFAULT) primary else c.getAccentColor(isDark)
+                                    },
+                                    count = countByFolder[folder.id] ?: 0,
+                                    indentationLevel = level,
+                                    onClick = { onSelectFilter(NotesFilter.Folder(folder.id, folder.name)) },
+                                    onAddSubfolder = {
+                                        parentForNewFolder = folder.id
+                                        showCreateFolderDialog = true
+                                    },
+                                    onEdit = { folderToEdit = folder },
+                                    onDelete = { folderToDelete = folder }
+                                )
+                                if (index < tree.lastIndex) RowDivider(start = (58 + level * 18).dp)
+                            }
                         }
                     }
                 }

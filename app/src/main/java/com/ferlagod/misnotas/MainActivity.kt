@@ -21,6 +21,22 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.EditNote
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.VerticalDivider
+import androidx.compose.runtime.key
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import com.ferlagod.misnotas.data.local.entity.FolderEntity
+import com.ferlagod.misnotas.ui.components.EmptyState
+import java.util.UUID
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
@@ -371,40 +387,139 @@ private fun AppNavigationHost(
 
         composable(AppDestinations.NOTES) {
             val filter = currentFilter
-            NotesScreen(
-                notes = notes,
-                folders = folders,
-                foldersMap = foldersMap,
-                currentFilter = filter,
-                searchQuery = searchQuery,
-                isGridLayout = settings.gridLayout,
-                sortOrder = settings.sortOrder,
-                autoPurgeTrash = settings.autoPurgeTrash,
-                snackbarHostState = snackbarHostState,
-                actions = NotesActions(
-                    onSearchQueryChange = viewModel::setSearchQuery,
-                    onToggleLayout = viewModel::toggleLayoutMode,
-                    onSortOrderChange = viewModel::setSortOrder,
-                    onBack = { navController.popBackStack() },
-                    onOpenNote = { noteId ->
+            val newNoteFolder = (filter as? NotesFilter.Folder)?.folderId
+            val newNotePinned = filter is NotesFilter.Pinned
+
+            // Nota abierta en el panel derecho (solo en pantallas anchas: móviles plegables
+            // desplegados, tablets o en horizontal). Una nota nueva recibe su id al abrirse,
+            // así sigue siendo la misma nota si se pliega el móvil mientras se escribe.
+            var paneNoteId by rememberSaveable { mutableStateOf<String?>(null) }
+            var paneIsNew by rememberSaveable { mutableStateOf(false) }
+
+            fun openInPane(noteId: String?) {
+                paneIsNew = noteId == null
+                paneNoteId = noteId ?: UUID.randomUUID().toString()
+            }
+
+            fun closePane() {
+                paneNoteId = null
+                paneIsNew = false
+            }
+
+            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                val twoPane = maxWidth >= TWO_PANE_MIN_WIDTH
+
+                // Al plegar el móvil con una nota abierta, la nota sigue abierta a pantalla completa.
+                LaunchedEffect(twoPane) {
+                    val noteId = paneNoteId
+                    if (!twoPane && noteId != null) {
+                        val isNew = paneIsNew
+                        closePane()
+                        // Si la nota nueva aún no se había guardado, conserva carpeta y fijado.
                         navController.navigate(
                             AppDestinations.editorRoute(
                                 noteId = noteId,
-                                folderId = (filter as? NotesFilter.Folder)?.folderId,
-                                pin = noteId == null && filter is NotesFilter.Pinned
+                                folderId = newNoteFolder.takeIf { isNew },
+                                pin = isNew && newNotePinned
                             )
                         )
-                    },
-                    onTogglePin = viewModel::togglePin,
-                    onTrash = viewModel::moveNotesToTrash,
-                    onRestore = viewModel::restoreNotes,
-                    onDeletePermanently = viewModel::deleteNotesPermanently,
-                    onEmptyTrash = viewModel::emptyTrash,
-                    onSetPinned = viewModel::setNotesPinned,
-                    onSetColor = viewModel::setNotesColor,
-                    onMove = viewModel::moveNotes
-                )
-            )
+                    }
+                }
+
+                val notesList = @Composable { modifier: Modifier ->
+                    Box(modifier = modifier) {
+                        NotesScreen(
+                            notes = notes,
+                            folders = folders,
+                            foldersMap = foldersMap,
+                            currentFilter = filter,
+                            searchQuery = searchQuery,
+                            isGridLayout = settings.gridLayout,
+                            sortOrder = settings.sortOrder,
+                            autoPurgeTrash = settings.autoPurgeTrash,
+                            snackbarHostState = snackbarHostState,
+                            activeNoteId = if (twoPane) paneNoteId else null,
+                            actions = NotesActions(
+                                onSearchQueryChange = viewModel::setSearchQuery,
+                                onToggleLayout = viewModel::toggleLayoutMode,
+                                onSortOrderChange = viewModel::setSortOrder,
+                                onBack = { navController.popBackStack() },
+                                onOpenNote = { noteId ->
+                                    if (twoPane) {
+                                        openInPane(noteId)
+                                    } else {
+                                        navController.navigate(
+                                            AppDestinations.editorRoute(
+                                                noteId = noteId,
+                                                folderId = newNoteFolder,
+                                                pin = noteId == null && newNotePinned
+                                            )
+                                        )
+                                    }
+                                },
+                                onTogglePin = viewModel::togglePin,
+                                onTrash = viewModel::moveNotesToTrash,
+                                onRestore = viewModel::restoreNotes,
+                                onDeletePermanently = viewModel::deleteNotesPermanently,
+                                onEmptyTrash = viewModel::emptyTrash,
+                                onSetPinned = viewModel::setNotesPinned,
+                                onSetColor = viewModel::setNotesColor,
+                                onMove = viewModel::moveNotes
+                            )
+                        )
+                    }
+                }
+
+                if (!twoPane) {
+                    notesList(Modifier.fillMaxSize())
+                } else {
+                    Row(modifier = Modifier.fillMaxSize()) {
+                        notesList(
+                            Modifier
+                                .weight(0.42f)
+                                .fillMaxHeight()
+                        )
+                        VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        Box(
+                            modifier = Modifier
+                                .weight(0.58f)
+                                .fillMaxHeight()
+                        ) {
+                            val currentPaneNote = paneNoteId
+                            if (currentPaneNote == null) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(MaterialTheme.colorScheme.background),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    EmptyState(
+                                        icon = Icons.Rounded.EditNote,
+                                        title = stringResource(R.string.pane_no_note_title),
+                                        message = stringResource(R.string.pane_no_note_message)
+                                    )
+                                }
+                            } else {
+                                // Snackbars propios: los avisos generales ya los muestra la lista.
+                                val paneSnackbar = remember { SnackbarHostState() }
+                                key(currentPaneNote) {
+                                    EditorHost(
+                                        viewModel = viewModel,
+                                        noteId = currentPaneNote,
+                                        isNewNote = paneIsNew,
+                                        folderId = newNoteFolder.takeIf { paneIsNew },
+                                        initialPinned = paneIsNew && newNotePinned,
+                                        folders = folders,
+                                        snackbarHostState = paneSnackbar,
+                                        onClose = ::closePane,
+                                        onOpenNote = { id -> openInPane(id) }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         composable(
@@ -416,40 +531,69 @@ private fun AppNavigationHost(
             )
         ) { backStackEntry ->
             val noteIdArg = backStackEntry.arguments?.getString("noteId")?.takeIf { it.isNotBlank() }
-            val folderIdArg = backStackEntry.arguments?.getString("folderId")?.takeIf { it.isNotBlank() }
-            val pinArg = backStackEntry.arguments?.getBoolean("pin") ?: false
-
-            // Se lee una sola vez de la base de datos (incluye notas en papelera).
-            var existingNote by remember(noteIdArg) { mutableStateOf<NoteEntity?>(null) }
-            var noteLoaded by remember(noteIdArg) { mutableStateOf(noteIdArg == null) }
-            LaunchedEffect(noteIdArg) {
-                if (noteIdArg != null) {
-                    existingNote = viewModel.getNoteById(noteIdArg)
-                    noteLoaded = true
-                }
-            }
-
-            NoteEditorScreen(
+            EditorHost(
+                viewModel = viewModel,
                 noteId = noteIdArg,
-                folderId = folderIdArg,
-                initialPinned = pinArg,
-                existingNote = existingNote,
-                noteLoaded = noteLoaded,
+                folderId = backStackEntry.arguments?.getString("folderId")?.takeIf { it.isNotBlank() },
+                initialPinned = backStackEntry.arguments?.getBoolean("pin") ?: false,
                 folders = folders,
                 snackbarHostState = snackbarHostState,
-                onBack = { navController.popBackStack() },
-                onSaveNote = { id, title, content, folderId, color, isPinned, sync, closing ->
-                    viewModel.saveNote(id, title, content, folderId, color, isPinned, sync, closing)
-                },
-                onDeleteNote = viewModel::deleteNote,
-                onDuplicateNote = viewModel::duplicateNote,
+                onClose = { navController.popBackStack() },
                 onOpenNote = { id ->
                     navController.navigate(AppDestinations.editorRoute(noteId = id)) {
                         popUpTo(AppDestinations.EDITOR) { inclusive = true }
                     }
-                },
-                onAddImage = viewModel::addImageAttachment
+                }
             )
         }
     }
+}
+
+/** Ancho a partir del cual la lista de notas y el editor se muestran lado a lado. */
+private val TWO_PANE_MIN_WIDTH = 600.dp
+
+/**
+ * Editor con la carga de la nota desde la base de datos. Se usa a pantalla completa
+ * y en el panel derecho de las pantallas anchas.
+ */
+@Composable
+private fun EditorHost(
+    viewModel: MainViewModel,
+    noteId: String?,
+    folderId: String?,
+    initialPinned: Boolean,
+    folders: List<FolderEntity>,
+    snackbarHostState: SnackbarHostState,
+    onClose: () -> Unit,
+    onOpenNote: (String) -> Unit,
+    isNewNote: Boolean = noteId == null
+) {
+    // Se lee una sola vez de la base de datos (incluye notas en papelera).
+    var existingNote by remember(noteId) { mutableStateOf<NoteEntity?>(null) }
+    var noteLoaded by remember(noteId) { mutableStateOf(noteId == null) }
+    LaunchedEffect(noteId) {
+        if (noteId != null) {
+            existingNote = viewModel.getNoteById(noteId)
+            noteLoaded = true
+        }
+    }
+
+    NoteEditorScreen(
+        noteId = noteId,
+        isNewNote = isNewNote,
+        folderId = folderId,
+        initialPinned = initialPinned,
+        existingNote = existingNote,
+        noteLoaded = noteLoaded,
+        folders = folders,
+        snackbarHostState = snackbarHostState,
+        onBack = onClose,
+        onSaveNote = { id, title, content, folder, color, isPinned, sync, closing ->
+            viewModel.saveNote(id, title, content, folder, color, isPinned, sync, closing)
+        },
+        onDeleteNote = viewModel::deleteNote,
+        onDuplicateNote = viewModel::duplicateNote,
+        onOpenNote = onOpenNote,
+        onAddImage = viewModel::addImageAttachment
+    )
 }

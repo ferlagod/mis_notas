@@ -275,4 +275,6 @@
         <item quantity="other">%d dossiers</item>
         <item quantity="many">%d dossiers</item>
     </plurals>
+    <string name="pane_no_note_title">Aucune note ouverte</string>
+    <string name="pane_no_note_message">Choisissez une note dans la liste ou créez-en une.</string>
 </resources>

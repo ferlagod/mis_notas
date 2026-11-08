@@ -34,6 +34,8 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -83,6 +85,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -210,7 +213,9 @@ fun NoteEditorScreen(
     onDeleteNote: (String) -> Unit,
     onDuplicateNote: suspend (String) -> String?,
     onOpenNote: (String) -> Unit,
-    onAddImage: suspend (Uri) -> String
+    onAddImage: suspend (Uri) -> String,
+    /** Nota recién creada (con id ya asignado o sin él): el cursor va directo al texto. */
+    isNewNote: Boolean = noteId == null
 ) {
     val isDark = isAppInDarkTheme()
     val primary = MaterialTheme.colorScheme.primary
@@ -265,7 +270,7 @@ fun NoteEditorScreen(
 
     // Nota nueva: el cursor va directo al cuerpo para escribir sin un toque extra.
     LaunchedEffect(Unit) {
-        if (noteId == null) {
+        if (isNewNote) {
             delay(150)
             runCatching { bodyFocus.requestFocus() }
         }
@@ -295,6 +300,9 @@ fun NoteEditorScreen(
     // Guardar al salir con el gesto/botón "atrás" del sistema y al pasar a segundo plano
     BackHandler { close() }
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { persistChanges(sync = true) }
+    // Al cerrar el editor sin pasar por "atrás" (p. ej. cambiar de nota en el panel lateral
+    // de un plegable) se guarda también lo escrito en el último segundo.
+    DisposableEffect(Unit) { onDispose { persistChanges(sync = true) } }
 
     fun updateBody(newValue: TextFieldValue, forceHistory: Boolean = false) {
         history.record(textValue, newValue, forceHistory)
@@ -503,11 +511,14 @@ fun NoteEditorScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = editorBackground
     ) { paddingValues ->
+        // En pantallas anchas (plegables abiertos, tablets) el texto no pasa de un ancho cómodo de lectura.
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
+                .wrapContentWidth(Alignment.CenterHorizontally)
+                .widthIn(max = READABLE_MAX_WIDTH)
                 .padding(horizontal = 20.dp, vertical = 8.dp)
         ) {
             Row(
@@ -685,6 +696,9 @@ fun NoteEditorScreen(
         ZoomableImageDialog(model = model, onDismiss = { viewerImage = null })
     }
 }
+
+/** Ancho máximo del texto de la nota, para que las líneas no sean incómodas de leer. */
+val READABLE_MAX_WIDTH = 760.dp
 
 private fun currentLine(value: TextFieldValue): String {
     val text = value.text

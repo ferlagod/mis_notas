@@ -264,4 +264,6 @@
         <item quantity="one">%d folder</item>
         <item quantity="other">%d folders</item>
     </plurals>
+    <string name="pane_no_note_title">No note selected</string>
+    <string name="pane_no_note_message">Choose a note from the list or create a new one.</string>
 </resources>

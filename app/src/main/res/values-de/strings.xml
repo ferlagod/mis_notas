@@ -263,4 +263,6 @@
         <item quantity="one">%d Ordner</item>
         <item quantity="other">%d Ordner</item>
     </plurals>
+    <string name="pane_no_note_title">Keine Notiz geöffnet</string>
+    <string name="pane_no_note_message">Wähle eine Notiz aus der Liste oder erstelle eine neue.</string>
 </resources>

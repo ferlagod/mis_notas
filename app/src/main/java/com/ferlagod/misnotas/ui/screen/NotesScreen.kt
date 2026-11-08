@@ -161,7 +161,9 @@ fun NotesScreen(
     sortOrder: SortOrder,
     autoPurgeTrash: Boolean,
     snackbarHostState: SnackbarHostState,
-    actions: NotesActions
+    actions: NotesActions,
+    /** Nota abierta en el panel lateral (pantallas anchas), para resaltarla en la lista. */
+    activeNoteId: String? = null
 ) {
     val isDark = isAppInDarkTheme()
     val primary = MaterialTheme.colorScheme.primary
@@ -375,7 +377,7 @@ fun NotesScreen(
                         }
                     }
                     items(pinnedNotes, key = { it.id }) { note ->
-                        NoteCardItem(note, foldersMap, isDark, isTrashView, selectedIds, searchTerms, actions, ::toggleSelection) {
+                        NoteCardItem(note, foldersMap, isDark, isTrashView, selectedIds, searchTerms, actions, ::toggleSelection, note.id == activeNoteId) {
                             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                             toggleSelection(note.id)
                         }
@@ -388,7 +390,7 @@ fun NotesScreen(
                         }
                     }
                     items(otherNotes, key = { it.id }) { note ->
-                        NoteCardItem(note, foldersMap, isDark, isTrashView, selectedIds, searchTerms, actions, ::toggleSelection) {
+                        NoteCardItem(note, foldersMap, isDark, isTrashView, selectedIds, searchTerms, actions, ::toggleSelection, note.id == activeNoteId) {
                             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                             toggleSelection(note.id)
                         }
@@ -473,6 +475,7 @@ private fun LazyStaggeredGridItemScope.NoteCardItem(
     searchTerms: List<String>,
     actions: NotesActions,
     onToggleSelection: (String) -> Unit,
+    isActive: Boolean,
     onLongPress: () -> Unit
 ) {
     val selectionMode = selectedIds.isNotEmpty()
@@ -482,6 +485,7 @@ private fun LazyStaggeredGridItemScope.NoteCardItem(
         isDark = isDark,
         isTrashView = isTrashView,
         isSelected = note.id in selectedIds,
+        isActive = isActive,
         searchTerms = searchTerms,
         onClick = {
             when {
@@ -749,13 +753,14 @@ fun NoteCard(
     onDelete: () -> Unit,
     onRestore: () -> Unit,
     onDeletePermanently: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isActive: Boolean = false
 ) {
     val noteColor = NoteColor.fromKey(note.color)
     val cardBackground = noteColor.toCardBackground(isDark)
     val primary = MaterialTheme.colorScheme.primary
     val cardBorder by animateColorAsState(
-        targetValue = if (isSelected) primary else noteColor.toCardBorder(isDark),
+        targetValue = if (isSelected || isActive) primary else noteColor.toCardBorder(isDark),
         label = "card_border"
     )
 
@@ -767,7 +772,7 @@ fun NoteCard(
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = cardBackground),
-        border = BorderStroke(if (isSelected) 2.dp else 1.dp, cardBorder),
+        border = BorderStroke(if (isSelected || isActive) 2.dp else 1.dp, cardBorder),
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))

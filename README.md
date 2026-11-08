@@ -30,6 +30,7 @@ Mis Notas combina el aspecto limpio de Apple Notas y Google Keep con la organiza
 - **Compartir**: envía notas a otras apps, cópialas o duplícalas, y crea notas desde "Compartir" en cualquier app (texto o imágenes). Acceso directo "Nueva nota" manteniendo pulsado el icono.
 - **Copia de seguridad en Markdown**: exporta todo a un ZIP (carpetas, imágenes y metadatos) e importa `.zip`, `.md` y `.txt`. Compatible con Obsidian, Joplin, etc.
 - **Bloqueo de la app** con huella, cara o PIN del dispositivo, y contenido oculto en las apps recientes.
+- **Móviles plegables y tablets**: en pantallas anchas la lista y la nota se ven lado a lado; al plegar el móvil la nota sigue abierta sin perder nada.
 - **Sincronización con Nextcloud** (WebDAV) automática: al abrir la app, al editar y cada ~30 minutos en segundo plano.
 - **Cifrado de extremo a extremo** AES-256-GCM con una contraseña maestra que nunca sale del dispositivo.
 - **Sin conflictos silenciosos**: si una nota se edita a la vez en dos dispositivos, se conservan ambas versiones.

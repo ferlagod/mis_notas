@@ -34,6 +34,7 @@ Primera versión pública.
 - Pantalla de Ajustes completa (Apariencia, Privacidad, Notas, Copia de seguridad, Sincronización, Idioma).
 - Diseño de la familia "Mis Apps", compartido con Mis Podcast: tipografías Outfit e Inter, cabecera con saludo según la hora y resumen, secciones con el color de la marca y pantalla de arranque con el verde del logo.
 - Opción de negro puro (AMOLED) para el modo oscuro.
+- Compatibilidad con móviles plegables y tablets: con 600 dp o más de ancho (plegable abierto, tablet o móvil en horizontal) la lista de notas y el editor se muestran en dos paneles; al plegar, la nota abierta pasa a pantalla completa sin perder cambios. El texto y los ajustes se limitan a un ancho cómodo de lectura.
 
 ### Cambiado
 - Todo el contenido de cada nota (también carpeta, color y fechas) va cifrado en un único bloque vinculado a su id.

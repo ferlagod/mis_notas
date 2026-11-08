@@ -275,4 +275,6 @@
         <item quantity="other">%d cartelle</item>
         <item quantity="many">%d cartelle</item>
     </plurals>
+    <string name="pane_no_note_title">Nessuna nota aperta</string>
+    <string name="pane_no_note_message">Scegli una nota dall’elenco o creane una nuova.</string>
 </resources>

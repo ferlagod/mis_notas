@@ -295,7 +295,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _isUnlocked.value = true
     }
 
-    suspend fun getNoteById(id: String): NoteEntity? = noteDao.getNoteById(id)
+    /** Lee la nota después de cualquier guardado pendiente (p. ej. al pasar del panel a pantalla completa). */
+    suspend fun getNoteById(id: String): NoteEntity? = noteWriteMutex.withLock { noteDao.getNoteById(id) }
 
     fun getCredentials(): NextcloudCredentials? = authPreferences.getCredentials()
 

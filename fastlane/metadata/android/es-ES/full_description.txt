@@ -17,5 +17,6 @@ Las notas se cifran en el teléfono con AES-256-GCM antes de subirse a tu Nextcl
 • Compartir notas y crear notas desde cualquier app.
 • Copia de seguridad en Markdown (ZIP con carpetas e imágenes) compatible con Obsidian, Joplin y otras apps.
 • Bloqueo con huella, cara o PIN.
+• Diseño adaptado a móviles plegables y tablets, con lista y nota lado a lado.
 • Tema claro, oscuro o negro puro AMOLED.
 • Disponible en español, inglés, francés, alemán e italiano.
