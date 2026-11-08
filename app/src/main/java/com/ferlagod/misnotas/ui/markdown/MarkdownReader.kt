@@ -38,16 +38,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.LinkAnnotation
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.TextLinkStyles
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.text.withLink
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -360,54 +354,19 @@ private fun ListRow(marker: String, indent: Int, markerColor: Color, content: @C
     }
 }
 
-private val INLINE_REGEX = Regex(
-    """(\*\*[^*]+\*\*|(?<![\p{L}\p{N}])__[^_]+__(?![\p{L}\p{N}])|~~[^~]+~~|`[^`]+`|\[[^\]]+]\([^)\s]+\)|\*[^*\s][^*]*\*|(?<![\p{L}\p{N}_])_[^_\s][^_]*_(?![\p{L}\p{N}_])|https?://[^\s<>()\[\]]+[^\s<>()\[\].,;:!?'"])"""
-)
-
 /**
- * Formato en línea: **negrita**, *cursiva*, ~~tachado~~, `código` y [enlaces](https://…).
+ * Formato en línea: **negrita**, *cursiva*, ~~tachado~~, `código` y [enlaces](https://…),
+ * con anidamiento (***negrita y cursiva***). Usa el mismo analizador que el editor visual.
  */
-fun inline(text: String, linkColor: Color = Color.Unspecified): AnnotatedString = buildAnnotatedString {
-    var cursor = 0
-    for (match in INLINE_REGEX.findAll(text)) {
-        if (match.range.first > cursor) append(text.substring(cursor, match.range.first))
-        val token = match.value
-        when {
-            token.startsWith("**") || token.startsWith("__") ->
-                withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(inline(token.substring(2, token.length - 2), linkColor)) }
-            token.startsWith("~~") ->
-                withStyle(SpanStyle(textDecoration = TextDecoration.LineThrough)) { append(token.removeSurrounding("~~")) }
-            token.startsWith("`") ->
-                withStyle(SpanStyle(fontFamily = FontFamily.Monospace, background = Color.Gray.copy(alpha = 0.15f))) {
-                    append(token.removeSurrounding("`"))
-                }
-            token.startsWith("http://") || token.startsWith("https://") ->
-                withLink(
-                    LinkAnnotation.Url(
-                        token,
-                        TextLinkStyles(SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline))
-                    )
-                ) { append(token) }
-            token.startsWith("[") -> {
-                val label = token.substring(1, token.indexOf("]("))
-                val url = token.substring(token.indexOf("](") + 2, token.length - 1)
-                if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("mailto:")) {
-                    withLink(
-                        LinkAnnotation.Url(
-                            url,
-                            TextLinkStyles(SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline))
-                        )
-                    ) { append(label) }
-                } else {
-                    append(token)
-                }
-            }
-            else ->
-                withStyle(SpanStyle(fontStyle = FontStyle.Italic)) { append(token.substring(1, token.length - 1)) }
-        }
-        cursor = match.range.last + 1
-    }
-    if (cursor < text.length) append(text.substring(cursor))
+fun inline(text: String, linkColor: Color = Color.Unspecified): AnnotatedString {
+    val colors = MarkdownColors(
+        accent = linkColor,
+        text = Color.Unspecified,
+        muted = Color.Unspecified,
+        codeBackground = Color.Gray.copy(alpha = 0.15f),
+        rule = Color.Unspecified
+    )
+    return renderMarkdown(text, MarkdownPresenter.inline(text, imageLabel = ""), colors, clickableLinks = true).text
 }
 
 /**

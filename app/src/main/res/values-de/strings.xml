@@ -197,6 +197,13 @@
     <string name="fmt_quote">Zitat</string>
     <string name="fmt_code">Code</string>
     <string name="fmt_rule">Trennlinie</string>
+    <string name="fmt_heading_1">Titel</string>
+    <string name="fmt_heading_2">Untertitel</string>
+    <string name="fmt_heading_3">Überschrift</string>
+    <string name="fmt_normal_text">Normaler Text</string>
+    <string name="link_text">Text</string>
+    <string name="link_url">Webadresse</string>
+    <string name="link_remove">Link entfernen</string>
     <string name="app_lock_prompt_title">Mis Notas entsperren</string>
     <string name="app_lock_prompt_subtitle">Nutze Fingerabdruck, Gesicht oder Displaysperre</string>
     <string name="app_locked_title">Mis Notas ist gesperrt</string>

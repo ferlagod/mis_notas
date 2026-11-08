@@ -226,7 +226,16 @@ class SyncRepository private constructor(context: Context) {
     private suspend fun runRound(client: WebDavClient, key: SecretKey) {
         _syncState.value = SyncState.Syncing(SyncStage.CONNECTING)
         client.ensureRootFolder()
-        vault.verifyRemoteKey(client, key)
+        if (vault.verifyRemoteKey(client, key)) {
+            // La bóveda se ha restaurado en una carpeta vacía o incompleta: se vuelve a subir
+            // todo lo que tiene este dispositivo, sin interpretar lo que falta como borrados.
+            database.withTransaction {
+                noteDao.resetSyncMetadata()
+                folderDao.resetSyncMetadata()
+                attachmentDao.markAllPendingUpload()
+                tombstoneDao.clear()
+            }
+        }
 
         val remote = client.listRemoteFiles().associateBy { it.name }
 
@@ -272,7 +281,7 @@ class SyncRepository private constructor(context: Context) {
                 when (val action = SyncMerger.resolveFolder(current, record, meta.etag)) {
                     is MergeAction.SaveRemote -> folderDao.upsertFolder(action.entity)
                     is MergeAction.KeepLocal -> folderDao.setRemoteEtag(id, action.etag)
-                    MergeAction.DeleteLocal -> folderDao.deletePermanently(id)
+                    MergeAction.DeleteLocal, is MergeAction.TrashLocal -> folderDao.deletePermanently(id)
                     else -> Unit
                 }
             }
@@ -284,7 +293,7 @@ class SyncRepository private constructor(context: Context) {
                 MissingRemoteAction.DELETE_LOCAL -> folderDao.deletePermanently(local.id)
                 MissingRemoteAction.MARK_FOR_UPLOAD -> folderDao.updateSyncStatus(local.id, SyncStatus.PENDING_UPLOAD)
                 MissingRemoteAction.FORGET_ETAG -> folderDao.setRemoteEtag(local.id, null)
-                MissingRemoteAction.NOTHING -> Unit
+                MissingRemoteAction.NOTHING, MissingRemoteAction.TRASH_AND_REUPLOAD -> Unit
             }
         }
     }
@@ -316,6 +325,7 @@ class SyncRepository private constructor(context: Context) {
                         noteDao.upsertNote(action.copy)
                     }
                     MergeAction.DeleteLocal -> noteDao.deletePermanently(id)
+                    is MergeAction.TrashLocal -> noteDao.trashFromRemote(id, action.etag)
                     MergeAction.Skip -> Unit
                 }
             }
@@ -323,7 +333,11 @@ class SyncRepository private constructor(context: Context) {
 
         for (local in noteDao.getAll()) {
             if (local.id in remoteNotes) continue
-            when (SyncMerger.resolveMissingRemote(local.syncStatus, local.remoteEtag)) {
+            when (SyncMerger.resolveMissingRemoteNote(local.syncStatus, local.remoteEtag)) {
+                MissingRemoteAction.TRASH_AND_REUPLOAD -> {
+                    Log.w(TAG, "La nota ${local.id} desapareció del servidor sin lápida; se mueve a la papelera")
+                    noteDao.trashForReupload(local.id)
+                }
                 MissingRemoteAction.DELETE_LOCAL -> noteDao.deletePermanently(local.id)
                 MissingRemoteAction.MARK_FOR_UPLOAD -> noteDao.updateSyncStatus(local.id, SyncStatus.PENDING_UPLOAD)
                 MissingRemoteAction.FORGET_ETAG -> noteDao.setRemoteEtag(local.id, null)
@@ -384,7 +398,7 @@ class SyncRepository private constructor(context: Context) {
                 folderDao.deletePermanently(folder.id)
                 continue
             }
-            val etag = putGuarded(client, name, RemoteCodec.encodeTombstone(RemoteCodec.TYPE_FOLDER, folder.id, folder.updatedAt), knownEtag)
+            val etag = putGuarded(client, name, RemoteCodec.encodeTombstone(RemoteCodec.TYPE_FOLDER, folder.id, folder.updatedAt, key), knownEtag)
                 ?: continue
             tombstoneDao.upsert(RemoteTombstoneEntity(name, etag.value))
             folderDao.deletePermanently(folder.id)
@@ -424,7 +438,7 @@ class SyncRepository private constructor(context: Context) {
                 noteDao.deletePermanently(note.id)
                 continue
             }
-            val etag = putGuarded(client, name, RemoteCodec.encodeTombstone(RemoteCodec.TYPE_NOTE, note.id, note.updatedAt), knownEtag)
+            val etag = putGuarded(client, name, RemoteCodec.encodeTombstone(RemoteCodec.TYPE_NOTE, note.id, note.updatedAt, key), knownEtag)
                 ?: continue
             tombstoneDao.upsert(RemoteTombstoneEntity(name, etag.value))
             noteDao.deletePermanently(note.id)

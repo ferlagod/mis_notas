@@ -47,11 +47,15 @@ data class KeyInfo(
             require(json.optString("kdf", CryptoManager.KDF_ALGORITHM) == CryptoManager.KDF_ALGORITHM) {
                 "Algoritmo de derivación no soportado"
             }
-            return KeyInfo(
-                salt = CryptoManager.saltFromBase64(json.getString("salt")),
-                iterations = json.getInt("iterations"),
-                check = json.getString("check")
-            )
+            val salt = CryptoManager.saltFromBase64(json.getString("salt"))
+            val iterations = json.getInt("iterations")
+            val check = json.getString("check")
+            require(salt.size >= CryptoManager.MIN_SALT_LENGTH_BYTES) { "Salt demasiado corto" }
+            require(iterations in CryptoManager.MIN_PBKDF2_ITERATIONS..CryptoManager.MAX_PBKDF2_ITERATIONS) {
+                "Iteraciones fuera de rango"
+            }
+            require(check.isNotBlank()) { "Verificador vacío" }
+            return KeyInfo(salt = salt, iterations = iterations, check = check)
         }
     }
 }

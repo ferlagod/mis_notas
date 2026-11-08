@@ -75,9 +75,35 @@ class RemoteCodecTest {
 
     @Test
     fun tombstoneRoundTrip() {
-        val raw = RemoteCodec.encodeTombstone(RemoteCodec.TYPE_NOTE, note.id, 42L)
+        val raw = RemoteCodec.encodeTombstone(RemoteCodec.TYPE_NOTE, note.id, 42L, key)
         val record = RemoteCodec.decodeNote(raw, note.id, key)
-        assertEquals(RemoteRecord.Tombstone(note.id, 42L), record)
+        assertEquals(RemoteRecord.Tombstone(note.id, 42L, verified = true), record)
+        assertTrue(RemoteCodec.isTombstone(raw))
+        assertFalse(RemoteCodec.isTombstone(RemoteCodec.encodeNote(note, key)))
+    }
+
+    @Test
+    fun legacyTombstoneWithoutProofIsUnverified() {
+        val raw = """{"format":"misnotas","version":2,"type":"note","id":"${note.id}","deleted":true,"deletedAt":7}"""
+        assertEquals(RemoteRecord.Tombstone(note.id, 7L, verified = false), RemoteCodec.decodeNote(raw, note.id, key))
+    }
+
+    @Test
+    fun forgedOrForeignTombstoneIsRejected() {
+        val other = CryptoManager.deriveKey("otra", CryptoManager.generateSalt())
+        val foreign = RemoteCodec.encodeTombstone(RemoteCodec.TYPE_NOTE, note.id, 42L, other)
+        try {
+            RemoteCodec.decodeNote(foreign, note.id, key)
+            fail("Una lápida de otra clave no debe aceptarse")
+        } catch (_: java.security.GeneralSecurityException) {
+        }
+        // Prueba válida pero copiada a otra nota: el AAD lo impide.
+        val moved = RemoteCodec.encodeTombstone(RemoteCodec.TYPE_NOTE, note.id, 42L, key).replace(note.id, "otra-nota")
+        try {
+            RemoteCodec.decodeNote(moved, "otra-nota", key)
+            fail("Una lápida movida a otra nota no debe aceptarse")
+        } catch (_: java.security.GeneralSecurityException) {
+        }
     }
 
     @Test

@@ -14,7 +14,12 @@ import javax.crypto.SecretKey
 /** Registro remoto descodificado: o bien la entidad viva, o bien una lápida de borrado. */
 sealed interface RemoteRecord<out T> {
     data class Live<T>(val entity: T) : RemoteRecord<T>
-    data class Tombstone(val id: String, val deletedAt: Long) : RemoteRecord<Nothing>
+    /**
+     * Lápida de borrado. [verified] es true si lleva una prueba cifrada con la clave de la bóveda
+     * (la generan las versiones actuales). Una lápida sin prueba puede venir de una versión
+     * antigua... o del propio servidor, así que no se usa para borrar notas de forma definitiva.
+     */
+    data class Tombstone(val id: String, val deletedAt: Long, val verified: Boolean = false) : RemoteRecord<Nothing>
 }
 
 /**
@@ -23,7 +28,7 @@ sealed interface RemoteRecord<out T> {
  * v2 (actual):
  * ```
  * { "format": "misnotas", "version": 2, "type": "note", "id": "<uuid>", "payload": "<base64 AES-GCM>" }
- * { "format": "misnotas", "version": 2, "type": "note", "id": "<uuid>", "deleted": true, "deletedAt": 0 }
+ * { "format": "misnotas", "version": 2, "type": "note", "id": "<uuid>", "deleted": true, "deletedAt": 0, "auth": "<base64 AES-GCM>" }
  * ```
  * El payload es un JSON cifrado con AAD = "<type>:<id>", así que todos los metadatos (carpeta,
  * color, fechas…) quedan ocultos al servidor y un fichero no puede hacerse pasar por otro.
@@ -63,7 +68,7 @@ object RemoteCodec {
         if (!json.has("format")) return RemoteRecord.Live(decodeLegacyNote(json, key))
 
         val id = checkEnvelope(json, TYPE_NOTE, expectedId)
-        tombstoneOrNull(json, id)?.let { return it }
+        tombstoneOrNull(json, TYPE_NOTE, id, key)?.let { return it }
 
         val payload = JSONObject(CryptoManager.decrypt(json.getString("payload"), key, aad(TYPE_NOTE, id)))
         return RemoteRecord.Live(
@@ -114,7 +119,7 @@ object RemoteCodec {
         if (!json.has("format")) return RemoteRecord.Live(decodeLegacyFolder(json, key))
 
         val id = checkEnvelope(json, TYPE_FOLDER, expectedId)
-        tombstoneOrNull(json, id)?.let { return it }
+        tombstoneOrNull(json, TYPE_FOLDER, id, key)?.let { return it }
 
         val payload = JSONObject(CryptoManager.decrypt(json.getString("payload"), key, aad(TYPE_FOLDER, id)))
         return RemoteRecord.Live(
@@ -144,8 +149,26 @@ object RemoteCodec {
     // Lápidas y adjuntos
     // ------------------------------------------------------------------
 
-    fun encodeTombstone(type: String, id: String, deletedAt: Long): String =
-        envelope(type, id).put("deleted", true).put("deletedAt", deletedAt).toString()
+    /**
+     * Lápida de borrado definitivo. Incluye `auth`: el instante del borrado cifrado con la clave
+     * y AAD = "tombstone:<type>:<id>", para que el servidor no pueda fabricar borrados.
+     */
+    fun encodeTombstone(type: String, id: String, deletedAt: Long, key: SecretKey): String =
+        envelope(type, id)
+            .put("deleted", true)
+            .put("deletedAt", deletedAt)
+            .put("auth", CryptoManager.encrypt(tombstoneProof(deletedAt), key, tombstoneAad(type, id)))
+            .toString()
+
+    /** true si [raw] es una lápida (no contiene nada cifrado con la clave de las notas). */
+    fun isTombstone(raw: String): Boolean = try {
+        JSONObject(raw).optBoolean("deleted", false)
+    } catch (_: Exception) {
+        false
+    }
+
+    private fun tombstoneAad(type: String, id: String) = "tombstone:$type:$id"
+    private fun tombstoneProof(deletedAt: Long) = "deleted:$deletedAt"
 
     fun encryptAttachment(bytes: ByteArray, id: String, key: SecretKey): ByteArray =
         CryptoManager.encryptBytes(bytes, key, aad("attachment", id))
@@ -173,8 +196,19 @@ object RemoteCodec {
         return id
     }
 
-    private fun tombstoneOrNull(json: JSONObject, id: String): RemoteRecord.Tombstone? =
-        if (json.optBoolean("deleted", false)) RemoteRecord.Tombstone(id, json.optLong("deletedAt", 0L)) else null
+    /**
+     * Devuelve la lápida si [json] lo es. Si trae prueba y no es válida (falsificada o de otra
+     * bóveda) lanza una excepción de cifrado y el fichero se ignora.
+     */
+    private fun tombstoneOrNull(json: JSONObject, type: String, id: String, key: SecretKey): RemoteRecord.Tombstone? {
+        if (!json.optBoolean("deleted", false)) return null
+        val deletedAt = json.optLong("deletedAt", 0L)
+        val auth = json.optString("auth", "")
+        if (auth.isEmpty()) return RemoteRecord.Tombstone(id, deletedAt, verified = false)
+        val proof = CryptoManager.decrypt(auth, key, tombstoneAad(type, id))
+        if (proof != tombstoneProof(deletedAt)) throw javax.crypto.AEADBadTagException("Lápida no válida")
+        return RemoteRecord.Tombstone(id, deletedAt, verified = true)
+    }
 
     private fun JSONObject.optStringOrNull(name: String): String? =
         if (!has(name) || isNull(name)) null else getString(name).takeIf { it.isNotBlank() }

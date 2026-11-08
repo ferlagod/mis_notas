@@ -198,6 +198,13 @@
     <string name="fmt_quote">Quote</string>
     <string name="fmt_code">Code</string>
     <string name="fmt_rule">Divider</string>
+    <string name="fmt_heading_1">Title</string>
+    <string name="fmt_heading_2">Subtitle</string>
+    <string name="fmt_heading_3">Heading</string>
+    <string name="fmt_normal_text">Normal text</string>
+    <string name="link_text">Text</string>
+    <string name="link_url">Web address</string>
+    <string name="link_remove">Remove link</string>
     <string name="app_lock_prompt_title">Unlock Mis Notas</string>
     <string name="app_lock_prompt_subtitle">Use your fingerprint, face or screen lock</string>
     <string name="app_locked_title">Mis Notas is locked</string>

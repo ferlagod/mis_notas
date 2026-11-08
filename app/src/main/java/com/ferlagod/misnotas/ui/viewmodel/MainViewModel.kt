@@ -26,6 +26,7 @@ import com.ferlagod.misnotas.data.local.pref.AppSettingsState
 import com.ferlagod.misnotas.data.local.pref.NextcloudCredentials
 import com.ferlagod.misnotas.data.local.pref.SortOrder
 import com.ferlagod.misnotas.data.local.pref.ThemeMode
+import com.ferlagod.misnotas.data.sync.SyncMerger
 import com.ferlagod.misnotas.data.sync.SyncRepository
 import com.ferlagod.misnotas.data.sync.SyncState
 import com.ferlagod.misnotas.data.sync.SyncWorker
@@ -95,6 +96,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Serializa las escrituras de notas (p. ej. autoguardado seguido de "mover a papelera"). */
     private val noteWriteMutex = Mutex()
+
+    /**
+     * Última versión (título, texto) de cada nota que conoce el editor. Si al guardar la base de
+     * datos tiene otra cosa, es que la sincronización trajo cambios de otro dispositivo mientras
+     * la nota estaba abierta: en vez de pisarlos se conservan como copia "(conflicto)".
+     */
+    private val editorBases = java.util.concurrent.ConcurrentHashMap<String, Pair<String, String>>()
 
     private val _events = Channel<UiEvent>(Channel.BUFFERED)
     val events: Flow<UiEvent> = _events.receiveAsFlow()
@@ -298,6 +306,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /** Lee la nota después de cualquier guardado pendiente (p. ej. al pasar del panel a pantalla completa). */
     suspend fun getNoteById(id: String): NoteEntity? = noteWriteMutex.withLock { noteDao.getNoteById(id) }
 
+    /** Nota en vivo, para que el editor muestre cambios de otros dispositivos si no se ha tocado. */
+    fun observeNote(id: String): Flow<NoteEntity?> = noteDao.getNoteByIdFlow(id)
+
     fun getCredentials(): NextcloudCredentials? = authPreferences.getCredentials()
 
     fun getLastSync(): Long? = authPreferences.getLastSync()
@@ -410,7 +421,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /** El editor ha cargado (o adoptado) esta versión de la nota. */
+    fun registerEditorBase(id: String, title: String, content: String) {
+        editorBases[id] = title to content
+    }
+
     private suspend fun saveNoteLocked(
+        id: String,
+        title: String,
+        content: String,
+        folderId: String?,
+        color: NoteColor,
+        isPinned: Boolean,
+        closing: Boolean
+    ) = database.withTransaction {
+        saveNoteInTransaction(id, title, content, folderId, color, isPinned, closing)
+    }
+
+    private suspend fun saveNoteInTransaction(
         id: String,
         title: String,
         content: String,
@@ -420,8 +448,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         closing: Boolean
     ) {
         val existing = noteDao.getNoteById(id)
-        val cleanTitle = title.trim()
-        val cleanContent = content.trimEnd()
+        var cleanTitle = title.trim()
+        var cleanContent = content.trimEnd()
+
+        val base = editorBases[id]
+        if (existing != null && base != null && (existing.title != base.first || existing.content != base.second)) {
+            if (cleanTitle == base.first.trim() && cleanContent == base.second.trimEnd()) {
+                // El usuario no ha tocado el texto: gana la versión recibida (solo se aplican
+                // los cambios de color, carpeta o fijado que haya hecho en el editor).
+                cleanTitle = existing.title
+                cleanContent = existing.content
+            } else if (existing.title != cleanTitle || existing.content != cleanContent) {
+                // Ambos lados cambiaron el texto: la versión recibida se guarda como copia.
+                noteDao.upsertNote(
+                    SyncMerger.conflictCopy(
+                        existing,
+                        UUID.randomUUID().toString(),
+                        text(R.string.conflict_suffix),
+                        text(R.string.untitled)
+                    )
+                )
+            }
+            editorBases[id] = cleanTitle to cleanContent
+        }
 
         if (cleanTitle.isEmpty() && cleanContent.isBlank()) {
             // Como en Keep o Apple Notas: una nota vacía no se guarda. Si antes tenía contenido
@@ -456,6 +505,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             syncStatus = if (existing?.syncStatus == SyncStatus.PENDING_DELETE) SyncStatus.PENDING_DELETE else SyncStatus.PENDING_UPLOAD
         )
         noteDao.upsertNote(entity)
+        editorBases[id] = cleanTitle to cleanContent
     }
 
     /** Borrado definitivo (con lápida en el servidor si hay cuenta). Requiere el cerrojo de escritura. */

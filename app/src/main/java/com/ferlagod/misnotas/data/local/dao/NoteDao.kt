@@ -92,6 +92,23 @@ interface NoteDao {
     @Query("UPDATE notes SET remoteEtag = :etag WHERE id = :id")
     suspend fun setRemoteEtag(id: String, etag: String?)
 
+    /**
+     * Borrado remoto no verificable: la nota pasa a la papelera local (recuperable) y queda
+     * sincronizada con la lápida. Si ya estaba en la papelera conserva su fecha.
+     */
+    @Query(
+        "UPDATE notes SET isDeleted = 1, syncStatus = 'SYNCED', remoteEtag = :etag, " +
+            "updatedAt = CASE WHEN isDeleted = 1 THEN updatedAt ELSE :now END WHERE id = :id"
+    )
+    suspend fun trashFromRemote(id: String, etag: String?, now: Long = System.currentTimeMillis())
+
+    /** La nota desapareció del servidor: a la papelera y pendiente de volver a subirse. */
+    @Query(
+        "UPDATE notes SET isDeleted = 1, syncStatus = 'PENDING_UPLOAD', remoteEtag = NULL, " +
+            "updatedAt = CASE WHEN isDeleted = 1 THEN updatedAt ELSE :now END WHERE id = :id"
+    )
+    suspend fun trashForReupload(id: String, now: Long = System.currentTimeMillis())
+
     @Query("UPDATE notes SET syncStatus = :status WHERE id = :id")
     suspend fun updateSyncStatus(id: String, status: SyncStatus)
 

@@ -39,7 +39,33 @@ object CryptoManager {
     const val GCM_TAG_LENGTH_BITS = 128
     const val DEFAULT_SALT_LENGTH_BYTES = 16
 
+    /** Límites aceptados al leer parámetros del servidor (evita bloqueos con valores absurdos). */
+    const val MIN_PBKDF2_ITERATIONS = 10_000
+    const val MAX_PBKDF2_ITERATIONS = 10_000_000
+    const val MIN_SALT_LENGTH_BYTES = 8
+
     private val secureRandom = SecureRandom()
+
+    /**
+     * Formas equivalentes de una misma contraseña, de más a menos probable.
+     *
+     * Distintos teclados (o sistemas) pueden escribir "ñ" o "á" como un solo carácter (NFC) o
+     * como letra + tilde combinable (NFD), y el autocompletado a veces añade un espacio final.
+     * Para el usuario es la misma contraseña, pero PBKDF2 derivaría claves distintas. Al
+     * desbloquear se prueba cada variante contra el verificador cifrado, así que una
+     * contraseña correcta nunca deja al usuario fuera. Las bóvedas nuevas usan la forma NFC.
+     */
+    fun passwordVariants(password: String): List<String> {
+        val nfc = java.text.Normalizer.normalize(password, java.text.Normalizer.Form.NFC)
+        val nfd = java.text.Normalizer.normalize(password, java.text.Normalizer.Form.NFD)
+        return listOf(password, nfc, nfd, password.trim(), nfc.trim(), nfd.trim())
+            .filter { it.isNotEmpty() }
+            .distinct()
+    }
+
+    /** Forma canónica con la que se crean las bóvedas nuevas. */
+    fun canonicalPassword(password: String): String =
+        java.text.Normalizer.normalize(password, java.text.Normalizer.Form.NFC)
 
     fun generateSalt(sizeBytes: Int = DEFAULT_SALT_LENGTH_BYTES): ByteArray {
         val salt = ByteArray(sizeBytes)
@@ -57,7 +83,7 @@ object CryptoManager {
     ): SecretKey {
         require(masterPassword.isNotEmpty()) { "La contraseña maestra no puede estar vacía" }
         require(salt.isNotEmpty()) { "El salt no puede estar vacío" }
-        require(iterations >= 10_000) { "Número de iteraciones demasiado bajo" }
+        require(iterations in MIN_PBKDF2_ITERATIONS..MAX_PBKDF2_ITERATIONS) { "Número de iteraciones fuera de rango" }
 
         val keySpec = PBEKeySpec(masterPassword, salt, iterations, KEY_LENGTH_BITS)
         try {

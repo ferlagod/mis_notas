@@ -15,6 +15,7 @@ data class TextEdit(val text: String, val selectionStart: Int, val selectionEnd:
 enum class LinePrefix(val marker: String) {
     HEADING1("# "),
     HEADING2("## "),
+    HEADING3("### "),
     BULLET("- "),
     TASK("- [ ] "),
     NUMBERED("1. "),
@@ -73,7 +74,29 @@ private fun lineHasPrefix(line: String, prefix: LinePrefix): Boolean {
         LinePrefix.BULLET -> Regex("""^[-*+] (?!\[[ xX]] )""").containsMatchIn(trimmed)
         LinePrefix.HEADING1 -> trimmed.startsWith("# ")
         LinePrefix.HEADING2 -> trimmed.startsWith("## ")
+        LinePrefix.HEADING3 -> trimmed.startsWith("### ")
         LinePrefix.QUOTE -> trimmed.startsWith(">")
+    }
+}
+
+/** Quita cualquier formato de bloque (título, lista, cita…) de las líneas tocadas por la selección. */
+fun clearLinePrefix(text: String, selStart: Int, selEnd: Int): TextEdit {
+    val start = selStart.coerceIn(0, text.length)
+    val end = selEnd.coerceIn(start, text.length)
+    val firstLineStart = text.lastIndexOf('\n', start - 1) + 1
+    val lastLineEnd = text.indexOf('\n', end).let { if (it == -1) text.length else it }
+    val lines = text.substring(firstLineStart, lastLineEnd).split('\n')
+    val newLines = lines.map { line ->
+        val match = ANY_PREFIX.find(line) ?: return@map line
+        match.groupValues[1] + line.substring(match.range.last + 1)
+    }
+    val replaced = newLines.joinToString("\n")
+    val newText = text.substring(0, firstLineStart) + replaced + text.substring(lastLineEnd)
+    val delta = replaced.length - (lastLineEnd - firstLineStart)
+    return if (start == end && lines.size == 1) {
+        TextEdit(newText, (start + delta).coerceIn(firstLineStart, firstLineStart + replaced.length))
+    } else {
+        TextEdit(newText, firstLineStart, firstLineStart + replaced.length)
     }
 }
 

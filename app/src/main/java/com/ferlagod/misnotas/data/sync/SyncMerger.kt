@@ -16,6 +16,12 @@ sealed interface MergeAction<out T> {
     /** Borrar la fila local. */
     data object DeleteLocal : MergeAction<Nothing>
 
+    /**
+     * Mover la nota local a la papelera (recuperable) y recordar el ETag remoto. Se usa con
+     * borrados que no se pueden verificar, para que nunca se pierda texto sin que el usuario lo vea.
+     */
+    data class TrashLocal(val etag: String?) : MergeAction<Nothing>
+
     /** Guardar la versión remota como sincronizada. */
     data class SaveRemote<T>(val entity: T) : MergeAction<T>
 
@@ -27,7 +33,14 @@ sealed interface MergeAction<out T> {
 }
 
 /** Acción cuando una entidad local ya no existe en el servidor. */
-enum class MissingRemoteAction { NOTHING, DELETE_LOCAL, MARK_FOR_UPLOAD, FORGET_ETAG }
+enum class MissingRemoteAction {
+    NOTHING,
+    DELETE_LOCAL,
+    MARK_FOR_UPLOAD,
+    FORGET_ETAG,
+    /** Nota: pasa a la papelera local y se vuelve a subir (como nota en papelera). */
+    TRASH_AND_REUPLOAD
+}
 
 /**
  * Reglas de fusión de la sincronización. Son funciones puras para poder probarlas.
@@ -52,8 +65,13 @@ object SyncMerger {
         when (remote) {
             is RemoteRecord.Tombstone -> return when {
                 local == null -> MergeAction.Skip
+                // Cambios locales sin subir: se conservan y resucitan la nota en el servidor.
                 local.syncStatus == SyncStatus.PENDING_UPLOAD -> MergeAction.KeepLocal(etag)
-                else -> MergeAction.DeleteLocal
+                local.syncStatus == SyncStatus.PENDING_DELETE -> MergeAction.DeleteLocal
+                // Borrado definitivo hecho por otro dispositivo con la misma clave.
+                remote.verified -> MergeAction.DeleteLocal
+                // Lápida sin prueba (versión antigua o servidor): a la papelera, recuperable.
+                else -> MergeAction.TrashLocal(etag)
             }
 
             is RemoteRecord.Live -> {
@@ -115,6 +133,18 @@ object SyncMerger {
         SyncStatus.PENDING_DELETE -> MissingRemoteAction.DELETE_LOCAL
     }
 
+    /**
+     * Como [resolveMissingRemote], pero para notas: si una nota sincronizada desaparece del
+     * servidor sin lápida (alguien borró el fichero a mano, o el servidor perdió datos) no se
+     * borra, sino que va a la papelera y se vuelve a subir.
+     */
+    fun resolveMissingRemoteNote(syncStatus: SyncStatus, remoteEtag: String?): MissingRemoteAction =
+        when (val action = resolveMissingRemote(syncStatus, remoteEtag)) {
+            MissingRemoteAction.DELETE_LOCAL ->
+                if (syncStatus == SyncStatus.PENDING_DELETE) action else MissingRemoteAction.TRASH_AND_REUPLOAD
+            else -> action
+        }
+
     fun sameNoteContent(a: NoteEntity, b: NoteEntity): Boolean =
         a.title == b.title &&
             a.content == b.content &&
@@ -123,7 +153,11 @@ object SyncMerger {
             a.isPinned == b.isPinned &&
             a.isDeleted == b.isDeleted
 
-    private fun asConflictCopy(note: NoteEntity, id: String, suffix: String, untitled: String) = note.copy(
+    private fun asConflictCopy(note: NoteEntity, id: String, suffix: String, untitled: String) =
+        conflictCopy(note, id, suffix, untitled)
+
+    /** Copia de [note] como nota nueva "(conflicto)", pendiente de subir. */
+    fun conflictCopy(note: NoteEntity, id: String, suffix: String = CONFLICT_SUFFIX, untitled: String = UNTITLED) = note.copy(
         id = id,
         title = note.title.ifBlank { untitled } + suffix,
         isPinned = false,

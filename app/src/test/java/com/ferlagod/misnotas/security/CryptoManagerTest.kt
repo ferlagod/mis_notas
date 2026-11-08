@@ -64,4 +64,25 @@ class CryptoManagerTest {
         val key = CryptoManager.deriveKey("TestPass", salt)
         assertTrue(key.encoded.contentEquals(CryptoManager.keyFromBase64(CryptoManager.keyToBase64(key)).encoded))
     }
+
+    @Test
+    fun passwordVariantsCoverUnicodeFormsAndStraySpaces() {
+        val nfc = "contrase\u00F1a"          // ñ como un solo carácter
+        val nfd = "contrasen\u0303a"         // n + tilde combinable
+        assertTrue(nfd in CryptoManager.passwordVariants(nfc))
+        assertTrue(nfc in CryptoManager.passwordVariants(nfd))
+        assertTrue("clave" in CryptoManager.passwordVariants("clave "))
+        assertEquals("tal cual va primero", "clave ", CryptoManager.passwordVariants("clave ").first())
+        assertEquals(listOf("abc"), CryptoManager.passwordVariants("abc"))
+        // Mismo texto para el usuario, misma clave tras normalizar.
+        val salt = CryptoManager.generateSalt()
+        val a = CryptoManager.deriveKey(CryptoManager.canonicalPassword(nfc), salt, 10_000)
+        val b = CryptoManager.deriveKey(CryptoManager.canonicalPassword(nfd), salt, 10_000)
+        assertEquals(CryptoManager.keyToBase64(a), CryptoManager.keyToBase64(b))
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun absurdIterationCountIsRejected() {
+        CryptoManager.deriveKey("x", CryptoManager.generateSalt(), Int.MAX_VALUE)
+    }
 }

@@ -201,6 +201,13 @@
     <string name="fmt_quote">Citation</string>
     <string name="fmt_code">Code</string>
     <string name="fmt_rule">Séparateur</string>
+    <string name="fmt_heading_1">Titre</string>
+    <string name="fmt_heading_2">Sous-titre</string>
+    <string name="fmt_heading_3">En-tête</string>
+    <string name="fmt_normal_text">Texte normal</string>
+    <string name="link_text">Texte</string>
+    <string name="link_url">Adresse web</string>
+    <string name="link_remove">Supprimer le lien</string>
     <string name="app_lock_prompt_title">Déverrouiller Mis Notas</string>
     <string name="app_lock_prompt_subtitle">Utilisez votre empreinte, votre visage ou le verrouillage de l’écran</string>
     <string name="app_locked_title">Mis Notas est verrouillée</string>

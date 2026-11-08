@@ -44,6 +44,7 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -577,6 +578,9 @@ private fun EditorHost(
             noteLoaded = true
         }
     }
+    // Versión en vivo: si llega un cambio de otro dispositivo y no se ha tocado la nota, se muestra.
+    val liveNoteFlow = remember(noteId) { noteId?.let(viewModel::observeNote) ?: kotlinx.coroutines.flow.flowOf(null) }
+    val liveNote by liveNoteFlow.collectAsState(initial = null)
 
     NoteEditorScreen(
         noteId = noteId,
@@ -584,7 +588,9 @@ private fun EditorHost(
         folderId = folderId,
         initialPinned = initialPinned,
         existingNote = existingNote,
+        liveNote = liveNote,
         noteLoaded = noteLoaded,
+        onBaseLoaded = viewModel::registerEditorBase,
         folders = folders,
         snackbarHostState = snackbarHostState,
         onBack = onClose,

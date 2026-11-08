@@ -18,7 +18,11 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -75,6 +79,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -98,16 +103,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -120,7 +130,25 @@ import com.ferlagod.misnotas.data.local.entity.NoteEntity
 import com.ferlagod.misnotas.ui.components.ColorPalette
 import com.ferlagod.misnotas.ui.components.FolderPickerDialog
 import com.ferlagod.misnotas.ui.components.ZoomableImageDialog
+import com.ferlagod.misnotas.data.local.model.SyncStatus
+import com.ferlagod.misnotas.ui.markdown.InlineKind
+import com.ferlagod.misnotas.ui.markdown.InlineToken
 import com.ferlagod.misnotas.ui.markdown.LinePrefix
+import com.ferlagod.misnotas.ui.markdown.LivePreviewTransformation
+import com.ferlagod.misnotas.ui.markdown.MarkdownColors
+import com.ferlagod.misnotas.ui.markdown.MarkdownDocumentCache
+import com.ferlagod.misnotas.ui.markdown.activeInlineKinds
+import com.ferlagod.misnotas.ui.markdown.applyLink
+import com.ferlagod.misnotas.ui.markdown.applyPendingStyles
+import com.ferlagod.misnotas.ui.markdown.clearLinePrefix
+import com.ferlagod.misnotas.ui.markdown.lineBlockAt
+import com.ferlagod.misnotas.ui.markdown.linkAt
+import com.ferlagod.misnotas.ui.markdown.newlineBeforeBlock
+import com.ferlagod.misnotas.ui.markdown.normalizeMarkdown
+import com.ferlagod.misnotas.ui.markdown.reconcileEdit
+import com.ferlagod.misnotas.ui.markdown.removeLink
+import com.ferlagod.misnotas.ui.markdown.toggleInlineStyle
+import com.ferlagod.misnotas.ui.markdown.toggleTaskBox
 import com.ferlagod.misnotas.ui.markdown.MarkdownReader
 import com.ferlagod.misnotas.ui.markdown.TextEdit
 import com.ferlagod.misnotas.ui.markdown.continueList
@@ -214,6 +242,10 @@ fun NoteEditorScreen(
     onDuplicateNote: suspend (String) -> String?,
     onOpenNote: (String) -> Unit,
     onAddImage: suspend (Uri) -> String,
+    /** Versión en vivo de la nota (cambia si la sincronización trae cambios de otro dispositivo). */
+    liveNote: NoteEntity? = null,
+    /** Avisa de la versión de la nota que tiene el editor, para detectar cambios simultáneos. */
+    onBaseLoaded: (id: String, title: String, content: String) -> Unit = { _, _, _ -> },
     /** Nota recién creada (con id ya asignado o sin él): el cursor va directo al texto. */
     isNewNote: Boolean = noteId == null
 ) {
@@ -252,6 +284,26 @@ fun NoteEditorScreen(
     val history = remember { EditHistory() }
     val bodyFocus = remember { FocusRequester() }
 
+    // Versión de la nota tal como se cargó (o se recibió de otro dispositivo sin haberla tocado).
+    var baseTitle by rememberSaveable { mutableStateOf("") }
+    var baseContent by rememberSaveable { mutableStateOf("") }
+
+    // Editor visual: el texto es Markdown pero se ve con formato y sin marcadores.
+    val markdownColors = MarkdownColors(
+        accent = primary,
+        text = MaterialTheme.colorScheme.onSurface,
+        muted = MaterialTheme.colorScheme.onSurfaceVariant,
+        codeBackground = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+        rule = MaterialTheme.colorScheme.outlineVariant
+    )
+    val docCache = remember(markdownColors, imageAlt) { MarkdownDocumentCache(imageAlt, markdownColors) }
+    val livePreview = remember(docCache) { LivePreviewTransformation(docCache) }
+    var bodyLayout by remember { mutableStateOf<TextLayoutResult?>(null) }
+    /** Formatos activados sin selección: se aplican a lo próximo que se escriba. */
+    var pendingStyles by remember { mutableStateOf(emptySet<InlineKind>()) }
+    var showHeadingMenu by remember { mutableStateOf(false) }
+    var linkDialog by remember { mutableStateOf<LinkDialogState?>(null) }
+
     // Carga inicial (solo una vez: una sincronización posterior no pisa lo que se está escribiendo)
     LaunchedEffect(existingNote, noteLoaded) {
         if (loaded) return@LaunchedEffect
@@ -262,10 +314,30 @@ fun NoteEditorScreen(
             selectedFolderId = existingNote.folderId
             updatedAt = existingNote.updatedAt
             textValue = TextFieldValue(existingNote.content)
+            baseTitle = existingNote.title
+            baseContent = existingNote.content
+            onBaseLoaded(stableId, existingNote.title, existingNote.content)
             loaded = true
         } else if (noteLoaded) {
             loaded = true
         }
+    }
+
+    // Llega una versión nueva de otro dispositivo: si aquí no se ha tocado el texto, se muestra.
+    // Si ya se había editado, se conserva lo escrito y la otra versión queda como copia "(conflicto)".
+    LaunchedEffect(liveNote) {
+        val note = liveNote ?: return@LaunchedEffect
+        if (!loaded || deleted || note.syncStatus != SyncStatus.SYNCED) return@LaunchedEffect
+        if (note.title == baseTitle && note.content == baseContent) return@LaunchedEffect
+        if (title.trim() != baseTitle.trim() || textValue.text.trimEnd() != baseContent.trimEnd()) return@LaunchedEffect
+        baseTitle = note.title
+        baseContent = note.content
+        onBaseLoaded(stableId, note.title, note.content)
+        title = note.title
+        val refreshed = TextFieldValue(note.content, TextRange(textValue.selection.start.coerceAtMost(note.content.length)))
+        history.record(textValue, refreshed, force = true)
+        textValue = refreshed
+        updatedAt = note.updatedAt
     }
 
     // Nota nueva: el cursor va directo al cuerpo para escribir sin un toque extra.
@@ -278,7 +350,7 @@ fun NoteEditorScreen(
 
     fun persistChanges(sync: Boolean, closing: Boolean = false) {
         if (!loaded || deleted) return
-        onSaveNote(stableId, title, textValue.text, selectedFolderId, selectedColor, isPinned, sync, closing)
+        onSaveNote(stableId, title, normalizeMarkdown(textValue.text), selectedFolderId, selectedColor, isPinned, sync, closing)
     }
 
     fun close() {
@@ -312,10 +384,104 @@ fun NoteEditorScreen(
     fun applyEdit(edit: TextEdit) = updateBody(textValue.apply(edit), forceHistory = true)
 
     fun onBodyChange(newValue: TextFieldValue) {
-        val continued = if (newValue.selection.collapsed) {
-            continueList(textValue.text, newValue.text, newValue.selection.start)
-        } else null
-        updateBody(if (continued != null) newValue.apply(continued) else newValue)
+        val old = textValue
+        if (newValue.text == old.text) {
+            // Solo se movió el cursor (o cambió la composición del teclado).
+            if (newValue.selection != old.selection) pendingStyles = emptySet()
+            textValue = newValue
+            return
+        }
+        if (newValue.selection.collapsed) {
+            val cursor = newValue.selection.start
+            val presentation = docCache.get(old.text).presentation
+            // 1. Que borrar o sustituir texto no deje marcadores sueltos a la vista.
+            reconcileEdit(old.text, newValue.text, cursor, presentation)?.let {
+                updateBody(newValue.apply(it))
+                return
+            }
+            // 2. Intro al principio de un título o elemento de lista: abre una línea encima.
+            newlineBeforeBlock(old.text, newValue.text, cursor, presentation)?.let {
+                updateBody(newValue.apply(it))
+                return
+            }
+            // 3. Negrita/cursiva… activadas sin selección: lo que se escribe lleva ese formato.
+            applyPendingStyles(old.text, newValue.text, cursor, pendingStyles)?.let { (edit, shift) ->
+                val insertStart = cursor - (newValue.text.length - old.text.length)
+                val composition = newValue.composition
+                    ?.takeIf { it.min >= insertStart }
+                    ?.let { TextRange(it.start + shift, it.end + shift) }
+                pendingStyles = emptySet()
+                updateBody(TextFieldValue(edit.text, TextRange(edit.selectionStart), composition))
+                return
+            }
+            // 4. Intro en una lista: continúa la lista.
+            continueList(old.text, newValue.text, cursor)?.let {
+                updateBody(newValue.apply(it))
+                return
+            }
+        }
+        updateBody(newValue)
+    }
+
+    fun toggleInline(kind: InlineKind) {
+        val sel = textValue.selection
+        val presentation = docCache.get(textValue.text).presentation
+        val edit = toggleInlineStyle(textValue.text, sel.min, sel.max, kind, presentation)
+        if (edit != null) {
+            pendingStyles = emptySet()
+            if (edit.text == textValue.text) {
+                textValue = textValue.copy(selection = TextRange(edit.selectionStart, edit.selectionEnd))
+            } else {
+                applyEdit(edit)
+            }
+        } else {
+            pendingStyles = if (kind in pendingStyles) pendingStyles - kind else pendingStyles + kind
+        }
+        runCatching { bodyFocus.requestFocus() }
+    }
+
+    fun setHeading(prefix: LinePrefix?) {
+        val sel = textValue.selection
+        val current = lineBlockAt(textValue.text, sel.min)
+        applyEdit(
+            when {
+                prefix == null -> clearLinePrefix(textValue.text, sel.min, sel.max)
+                current == prefix -> clearLinePrefix(textValue.text, sel.min, sel.max)
+                else -> toggleLinePrefix(textValue.text, sel.min, sel.max, prefix)
+            }
+        )
+    }
+
+    fun openLinkDialog() {
+        val sel = textValue.selection
+        val presentation = docCache.get(textValue.text).presentation
+        val existing = linkAt(presentation, sel.min)
+        linkDialog = if (existing != null) {
+            LinkDialogState(
+                label = textValue.text.substring(existing.contentStart, existing.contentEnd),
+                url = existing.url.orEmpty(),
+                existing = existing
+            )
+        } else {
+            LinkDialogState(label = textValue.text.substring(sel.min, sel.max), url = "", existing = null)
+        }
+    }
+
+    /** Toque en la casilla de una tarea dentro del editor: la marca o desmarca. */
+    fun onBodyTap(position: Offset): Boolean {
+        val layout = bodyLayout ?: return false
+        val rendered = docCache.get(textValue.text)
+        val slop = 12f * context.resources.displayMetrics.density
+        for (box in rendered.presentation.tasks) {
+            val displayOffset = rendered.mapping.toDisplay(box.markerStart)
+            if (displayOffset >= layout.layoutInput.text.length) continue
+            val rect = layout.getBoundingBox(displayOffset)
+            if (position.x in (rect.left - slop)..(rect.right + slop) && position.y in rect.top..rect.bottom) {
+                updateBody(TextFieldValue(toggleTaskBox(textValue.text, box), textValue.selection), forceHistory = true)
+                return true
+            }
+        }
+        return false
     }
 
     fun linePrefix(prefix: LinePrefix) {
@@ -475,32 +641,30 @@ fun NoteEditorScreen(
         },
         bottomBar = {
             AnimatedVisibility(visible = !isReadingMode) {
+                val sel = textValue.selection
+                val presentation = docCache.get(textValue.text).presentation
+                val activeInline = activeInlineKinds(presentation, sel.min, sel.max) + pendingStyles
+                val activeBlock = lineBlockAt(textValue.text, sel.min)
                 FormattingToolbar(
                     canUndo = history.canUndo,
                     canRedo = history.canRedo,
+                    activeInline = activeInline,
+                    activeBlock = activeBlock,
+                    showHeadingMenu = showHeadingMenu,
+                    onHeadingMenu = { showHeadingMenu = it },
                     onUndo = { history.undo(textValue)?.let { textValue = it } },
                     onRedo = { history.redo(textValue)?.let { textValue = it } },
-                    onHeading = {
-                        // Alterna: texto → Título 1 → Título 2 → texto
-                        val line = currentLine(textValue)
-                        when {
-                            line.trimStart().startsWith("## ") -> linePrefix(LinePrefix.HEADING2)
-                            line.trimStart().startsWith("# ") -> linePrefix(LinePrefix.HEADING2)
-                            else -> linePrefix(LinePrefix.HEADING1)
-                        }
-                    },
-                    onBold = { wrap("**") },
-                    onItalic = { wrap("*") },
-                    onStrike = { wrap("~~") },
+                    onHeading = { setHeading(it) },
+                    onInline = { toggleInline(it) },
                     onBullet = { linePrefix(LinePrefix.BULLET) },
                     onNumbered = { linePrefix(LinePrefix.NUMBERED) },
                     onTask = { linePrefix(LinePrefix.TASK) },
                     onQuote = { linePrefix(LinePrefix.QUOTE) },
                     onCode = {
-                        if (textValue.selection.collapsed || !textValue.text.substring(textValue.selection.min, textValue.selection.max).contains('\n')) wrap("`")
+                        if (textValue.selection.collapsed || !textValue.text.substring(textValue.selection.min, textValue.selection.max).contains('\n')) toggleInline(InlineKind.CODE)
                         else wrap("```\n", "\n```")
                     },
-                    onLink = { wrap("[", "](https://)") },
+                    onLink = { openLinkDialog() },
                     onRule = { insert(if (textValue.text.substring(0, textValue.selection.min).let { it.isEmpty() || it.endsWith("\n") }) "---\n" else "\n---\n") },
                     onImage = {
                         photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
@@ -601,6 +765,8 @@ fun NoteEditorScreen(
                     BasicTextField(
                         value = textValue,
                         onValueChange = ::onBodyChange,
+                        visualTransformation = livePreview,
+                        onTextLayout = { bodyLayout = it },
                         textStyle = MaterialTheme.typography.bodyLarge.copy(
                             color = MaterialTheme.colorScheme.onSurface,
                             lineHeight = 24.sp
@@ -610,7 +776,17 @@ fun NoteEditorScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(min = 350.dp)
-                            .focusRequester(bodyFocus),
+                            .focusRequester(bodyFocus)
+                            .pointerInput(Unit) {
+                                // Se observa el toque sin consumirlo: el cursor se coloca igual.
+                                awaitEachGesture {
+                                    val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                                    val up = waitForUpOrCancellation(pass = PointerEventPass.Initial) ?: return@awaitEachGesture
+                                    if ((up.position - down.position).getDistance() < viewConfiguration.touchSlop) {
+                                        onBodyTap(up.position)
+                                    }
+                                }
+                            },
                         decorationBox = { innerTextField ->
                             if (textValue.text.isEmpty()) {
                                 Text(
@@ -695,18 +871,76 @@ fun NoteEditorScreen(
     viewerImage?.let { model ->
         ZoomableImageDialog(model = model, onDismiss = { viewerImage = null })
     }
+
+    linkDialog?.let { state ->
+        LinkDialog(
+            state = state,
+            onDismiss = { linkDialog = null },
+            onRemove = state.existing?.let { link ->
+                {
+                    applyEdit(removeLink(textValue.text, link))
+                    linkDialog = null
+                }
+            },
+            onConfirm = { label, url ->
+                val sel = textValue.selection
+                applyEdit(applyLink(textValue.text, sel.min, sel.max, label, url, state.existing))
+                linkDialog = null
+                runCatching { bodyFocus.requestFocus() }
+            }
+        )
+    }
+}
+
+/** Datos del diálogo de enlace: texto, dirección y el enlace que se edita (si ya existía). */
+private data class LinkDialogState(val label: String, val url: String, val existing: InlineToken?)
+
+@Composable
+private fun LinkDialog(
+    state: LinkDialogState,
+    onDismiss: () -> Unit,
+    onRemove: (() -> Unit)?,
+    onConfirm: (label: String, url: String) -> Unit
+) {
+    var label by remember { mutableStateOf(state.label) }
+    var url by remember { mutableStateOf(state.url) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.fmt_link), fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = label,
+                    onValueChange = { label = it.replace("\n", " ") },
+                    label = { Text(stringResource(R.string.link_text)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = url,
+                    onValueChange = { url = it.trim() },
+                    label = { Text(stringResource(R.string.link_url)) },
+                    placeholder = { Text("https://") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                if (onRemove != null) {
+                    TextButton(onClick = onRemove) { Text(stringResource(R.string.link_remove), color = AccentRed) }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(label, url) }, enabled = url.isNotBlank()) { Text(stringResource(R.string.save)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+        }
+    )
 }
 
 /** Ancho máximo del texto de la nota, para que las líneas no sean incómodas de leer. */
 val READABLE_MAX_WIDTH = 760.dp
-
-private fun currentLine(value: TextFieldValue): String {
-    val text = value.text
-    val pos = value.selection.min.coerceIn(0, text.length)
-    val start = text.lastIndexOf('\n', pos - 1) + 1
-    val end = text.indexOf('\n', pos).let { if (it == -1) text.length else it }
-    return text.substring(start, end)
-}
 
 private fun noteAsPlainText(title: String, content: String): String =
     listOf(title.trim(), markdownPlainText(content).trim()).filter { it.isNotEmpty() }.joinToString("\n\n")
@@ -760,12 +994,14 @@ private fun MetaChip(
 private fun FormattingToolbar(
     canUndo: Boolean,
     canRedo: Boolean,
+    activeInline: Set<InlineKind>,
+    activeBlock: LinePrefix?,
+    showHeadingMenu: Boolean,
+    onHeadingMenu: (Boolean) -> Unit,
     onUndo: () -> Unit,
     onRedo: () -> Unit,
-    onHeading: () -> Unit,
-    onBold: () -> Unit,
-    onItalic: () -> Unit,
-    onStrike: () -> Unit,
+    onHeading: (LinePrefix?) -> Unit,
+    onInline: (InlineKind) -> Unit,
     onBullet: () -> Unit,
     onNumbered: () -> Unit,
     onTask: () -> Unit,
@@ -776,6 +1012,7 @@ private fun FormattingToolbar(
     onImage: () -> Unit
 ) {
     val primary = MaterialTheme.colorScheme.primary
+    val isHeading = activeBlock == LinePrefix.HEADING1 || activeBlock == LinePrefix.HEADING2 || activeBlock == LinePrefix.HEADING3
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
@@ -794,23 +1031,61 @@ private fun FormattingToolbar(
         ) {
             ToolbarButton(Icons.AutoMirrored.Rounded.Undo, stringResource(R.string.undo), primary, onUndo, enabled = canUndo)
             ToolbarButton(Icons.AutoMirrored.Rounded.Redo, stringResource(R.string.redo), primary, onRedo, enabled = canRedo)
-            VerticalDivider(modifier = Modifier
-                .height(24.dp)
-                .padding(horizontal = 4.dp))
-            ToolbarButton(Icons.Rounded.CheckBox, stringResource(R.string.fmt_task), primary, onTask)
-            ToolbarButton(Icons.AutoMirrored.Rounded.FormatListBulleted, stringResource(R.string.fmt_bullet), primary, onBullet)
-            ToolbarButton(Icons.Rounded.FormatListNumbered, stringResource(R.string.fmt_numbered), primary, onNumbered)
-            ToolbarButton(Icons.Rounded.Title, stringResource(R.string.fmt_heading), primary, onHeading)
-            ToolbarButton(Icons.Rounded.FormatBold, stringResource(R.string.fmt_bold), primary, onBold)
-            ToolbarButton(Icons.Rounded.FormatItalic, stringResource(R.string.fmt_italic), primary, onItalic)
-            ToolbarButton(Icons.Rounded.FormatStrikethrough, stringResource(R.string.fmt_strike), primary, onStrike)
+            ToolbarDivider()
+            Box {
+                ToolbarButton(Icons.Rounded.Title, stringResource(R.string.fmt_heading), primary, { onHeadingMenu(true) }, active = isHeading)
+                DropdownMenu(expanded = showHeadingMenu, onDismissRequest = { onHeadingMenu(false) }) {
+                    HeadingMenuItem(stringResource(R.string.fmt_heading_1), 22.sp, activeBlock == LinePrefix.HEADING1) {
+                        onHeadingMenu(false); onHeading(LinePrefix.HEADING1)
+                    }
+                    HeadingMenuItem(stringResource(R.string.fmt_heading_2), 19.sp, activeBlock == LinePrefix.HEADING2) {
+                        onHeadingMenu(false); onHeading(LinePrefix.HEADING2)
+                    }
+                    HeadingMenuItem(stringResource(R.string.fmt_heading_3), 17.sp, activeBlock == LinePrefix.HEADING3) {
+                        onHeadingMenu(false); onHeading(LinePrefix.HEADING3)
+                    }
+                    HeadingMenuItem(stringResource(R.string.fmt_normal_text), 15.sp, !isHeading, bold = false) {
+                        onHeadingMenu(false); onHeading(null)
+                    }
+                }
+            }
+            ToolbarButton(Icons.Rounded.FormatBold, stringResource(R.string.fmt_bold), primary, { onInline(InlineKind.BOLD) }, active = InlineKind.BOLD in activeInline)
+            ToolbarButton(Icons.Rounded.FormatItalic, stringResource(R.string.fmt_italic), primary, { onInline(InlineKind.ITALIC) }, active = InlineKind.ITALIC in activeInline)
+            ToolbarButton(Icons.Rounded.FormatStrikethrough, stringResource(R.string.fmt_strike), primary, { onInline(InlineKind.STRIKE) }, active = InlineKind.STRIKE in activeInline)
+            ToolbarDivider()
+            ToolbarButton(Icons.Rounded.CheckBox, stringResource(R.string.fmt_task), primary, onTask, active = activeBlock == LinePrefix.TASK)
+            ToolbarButton(Icons.AutoMirrored.Rounded.FormatListBulleted, stringResource(R.string.fmt_bullet), primary, onBullet, active = activeBlock == LinePrefix.BULLET)
+            ToolbarButton(Icons.Rounded.FormatListNumbered, stringResource(R.string.fmt_numbered), primary, onNumbered, active = activeBlock == LinePrefix.NUMBERED)
+            ToolbarButton(Icons.Rounded.FormatQuote, stringResource(R.string.fmt_quote), primary, onQuote, active = activeBlock == LinePrefix.QUOTE)
+            ToolbarDivider()
             ToolbarButton(Icons.Rounded.Image, stringResource(R.string.fmt_image), primary, onImage)
-            ToolbarButton(Icons.Rounded.Link, stringResource(R.string.fmt_link), primary, onLink)
-            ToolbarButton(Icons.Rounded.FormatQuote, stringResource(R.string.fmt_quote), primary, onQuote)
-            ToolbarButton(Icons.Rounded.Code, stringResource(R.string.fmt_code), primary, onCode)
+            ToolbarButton(Icons.Rounded.Link, stringResource(R.string.fmt_link), primary, onLink, active = InlineKind.LINK in activeInline)
+            ToolbarButton(Icons.Rounded.Code, stringResource(R.string.fmt_code), primary, onCode, active = InlineKind.CODE in activeInline)
             ToolbarButton(Icons.Rounded.HorizontalRule, stringResource(R.string.fmt_rule), primary, onRule)
         }
     }
+}
+
+@Composable
+private fun ToolbarDivider() {
+    VerticalDivider(modifier = Modifier
+        .height(24.dp)
+        .padding(horizontal = 4.dp))
+}
+
+@Composable
+private fun HeadingMenuItem(label: String, size: androidx.compose.ui.unit.TextUnit, selected: Boolean, bold: Boolean = true, onClick: () -> Unit) {
+    DropdownMenuItem(
+        text = {
+            Text(
+                text = label,
+                fontSize = size,
+                fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal,
+                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+            )
+        },
+        onClick = onClick
+    )
 }
 
 @Composable
@@ -819,9 +1094,17 @@ private fun ToolbarButton(
     description: String,
     tint: Color,
     onClick: () -> Unit,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    active: Boolean = false
 ) {
-    IconButton(onClick = onClick, enabled = enabled, modifier = Modifier.size(44.dp)) {
+    IconButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier
+            .size(44.dp)
+            .padding(2.dp)
+            .background(if (active) tint.copy(alpha = 0.16f) else Color.Transparent, RoundedCornerShape(10.dp))
+    ) {
         Icon(
             imageVector = icon,
             contentDescription = description,

@@ -67,14 +67,36 @@ class SyncMergerTest {
     }
 
     @Test
-    fun tombstoneDeletesSyncedNote() {
-        assertEquals(MergeAction.DeleteLocal, SyncMerger.resolveNote(note(), RemoteRecord.Tombstone("n1", 1), "e2", newId))
+    fun verifiedTombstoneDeletesSyncedNote() {
+        assertEquals(
+            MergeAction.DeleteLocal,
+            SyncMerger.resolveNote(note(), RemoteRecord.Tombstone("n1", 1, verified = true), "e2", newId)
+        )
+    }
+
+    @Test
+    fun unverifiedTombstoneOnlyMovesToTrash() {
+        assertEquals(
+            MergeAction.TrashLocal("e2"),
+            SyncMerger.resolveNote(note(), RemoteRecord.Tombstone("n1", 1, verified = false), "e2", newId)
+        )
+    }
+
+    @Test
+    fun missingRemoteNoteGoesToTrashInsteadOfBeingDeleted() {
+        assertEquals(MissingRemoteAction.TRASH_AND_REUPLOAD, SyncMerger.resolveMissingRemoteNote(SyncStatus.SYNCED, "e1"))
+        assertEquals(MissingRemoteAction.DELETE_LOCAL, SyncMerger.resolveMissingRemoteNote(SyncStatus.PENDING_DELETE, "e1"))
+        assertEquals(MissingRemoteAction.MARK_FOR_UPLOAD, SyncMerger.resolveMissingRemoteNote(SyncStatus.SYNCED, null))
     }
 
     @Test
     fun tombstoneNeverDeletesUnsyncedEdits() {
         val local = note(status = SyncStatus.PENDING_UPLOAD)
         assertEquals(MergeAction.KeepLocal("e2"), SyncMerger.resolveNote(local, RemoteRecord.Tombstone("n1", 1), "e2", newId))
+        assertEquals(
+            MergeAction.KeepLocal("e2"),
+            SyncMerger.resolveNote(local, RemoteRecord.Tombstone("n1", 1, verified = true), "e2", newId)
+        )
     }
 
     @Test

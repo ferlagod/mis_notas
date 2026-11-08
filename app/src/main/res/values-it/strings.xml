@@ -201,6 +201,13 @@
     <string name="fmt_quote">Citazione</string>
     <string name="fmt_code">Codice</string>
     <string name="fmt_rule">Separatore</string>
+    <string name="fmt_heading_1">Titolo</string>
+    <string name="fmt_heading_2">Sottotitolo</string>
+    <string name="fmt_heading_3">Intestazione</string>
+    <string name="fmt_normal_text">Testo normale</string>
+    <string name="link_text">Testo</string>
+    <string name="link_url">Indirizzo web</string>
+    <string name="link_remove">Rimuovi link</string>
     <string name="app_lock_prompt_title">Sblocca Mis Notas</string>
     <string name="app_lock_prompt_subtitle">Usa impronta, volto o blocco schermo</string>
     <string name="app_locked_title">Mis Notas è bloccata</string>
