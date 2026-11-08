@@ -1,0 +1,170 @@
+<!doctype html>
+<!--
+  SPDX-License-Identifier: GPL-3.0-or-later
+  Copyright (C) 2026 ferlagod
+  Mis Notas — https://github.com/ferlagod/mis_notas
+-->
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Política de privacidad · Mis Notas</title>
+  <meta name="description" content="Política de privacidad de Mis Notas, app de notas libre para Android.">
+  <style>
+    :root {
+      --bg: #F2F2F7;
+      --card: #FFFFFF;
+      --text: #1C1C1E;
+      --muted: #6C6C70;
+      --brand: #557331;
+      --line: #E5E5EA;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #121214;
+        --card: #1C1C1E;
+        --text: #F2F2F7;
+        --muted: #98989D;
+        --brand: #A8C47E;
+        --line: #2C2C2E;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 16px/1.6 Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+    main { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
+    .eyebrow {
+      color: var(--brand);
+      font-weight: 700;
+      font-size: 13px;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      margin: 0;
+    }
+    h1 {
+      font-family: Outfit, Inter, system-ui, sans-serif;
+      font-size: clamp(30px, 6vw, 40px);
+      line-height: 1.15;
+      margin: 4px 0 6px;
+    }
+    .meta { color: var(--muted); margin: 0 0 24px; }
+    .summary {
+      background: var(--card);
+      border-left: 4px solid var(--brand);
+      border-radius: 16px;
+      padding: 16px 20px;
+      margin-bottom: 28px;
+    }
+    .summary p { margin: 0; }
+    section {
+      background: var(--card);
+      border-radius: 16px;
+      padding: 8px 20px 12px;
+      margin-bottom: 14px;
+    }
+    h2 {
+      font-family: Outfit, Inter, system-ui, sans-serif;
+      font-size: 20px;
+      margin: 14px 0 6px;
+    }
+    ul { padding-left: 20px; margin: 8px 0; }
+    li { margin: 4px 0; }
+    a { color: var(--brand); }
+    code { font-size: 14px; background: var(--line); border-radius: 6px; padding: 1px 6px; }
+    table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 15px; }
+    th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { color: var(--muted); font-weight: 600; }
+    footer { color: var(--muted); font-size: 14px; margin-top: 28px; text-align: center; }
+  </style>
+</head>
+<body>
+<main>
+  <p class="eyebrow">Mis Notas</p>
+  <h1>Política de privacidad</h1>
+  <p class="meta">Última actualización: 8 de noviembre de 2026</p>
+
+  <div class="summary">
+    <p><strong>En resumen:</strong> Mis Notas no recoge ningún dato tuyo. No hay anuncios, analítica, rastreadores ni cuentas. Tus notas se guardan en tu teléfono y, solo si tú lo activas, se sincronizan <strong>cifradas</strong> con el servidor Nextcloud que tú elijas. El desarrollador no tiene acceso a ellas en ningún caso.</p>
+  </div>
+
+  <section>
+    <h2>1. Quién es el responsable</h2>
+    <p>Mis Notas es una aplicación de software libre para Android desarrollada por <strong>ferlagod</strong> y publicada bajo la licencia GNU GPL v3. Su código fuente es público y se puede revisar en <a href="https://github.com/ferlagod/mis_notas">github.com/ferlagod/mis_notas</a>.</p>
+    <p>Para cualquier consulta sobre privacidad puedes escribir a: <a href="mailto:[CORREO DE CONTACTO]">[CORREO DE CONTACTO]</a>.</p>
+  </section>
+
+  <section>
+    <h2>2. Datos que recoge el desarrollador</h2>
+    <p><strong>Ninguno.</strong> La app no envía al desarrollador ni a terceros ningún dato personal, identificador del dispositivo, estadística de uso, informe de errores ni contenido de tus notas. No incluye bibliotecas de publicidad, analítica ni seguimiento, y no usa servicios de Google Play ni Firebase.</p>
+  </section>
+
+  <section>
+    <h2>3. Datos que se guardan en tu dispositivo</h2>
+    <ul>
+      <li><strong>Notas, carpetas e imágenes</strong> que tú creas. Se guardan en el almacenamiento privado de la app, al que otras apps no pueden acceder, y quedan protegidas por el cifrado del propio dispositivo.</li>
+      <li><strong>Preferencias</strong> de la app: tema, idioma, orden de las notas, etc.</li>
+      <li>Si conectas Nextcloud: la <strong>dirección del servidor, tu usuario y la contraseña de aplicación</strong>, junto con la clave de cifrado derivada de tu contraseña maestra. Se guardan cifrados con el almacén de claves seguro de Android (Android Keystore).</li>
+    </ul>
+    <p>Tu <strong>contraseña maestra</strong> no se guarda en ningún sitio ni se envía nunca a ningún servidor.</p>
+    <p>Las imágenes que añades a una nota se eligen con el selector de fotos del sistema. La app solo accede a las imágenes que tú seleccionas y guarda una copia comprimida dentro de la nota.</p>
+  </section>
+
+  <section>
+    <h2>4. Sincronización opcional con Nextcloud</h2>
+    <p>Si decides activarla, la app se conecta <strong>únicamente al servidor Nextcloud (WebDAV) que tú indicas</strong>, siempre mediante conexión segura HTTPS. El desarrollador no opera ese servidor ni tiene acceso a él.</p>
+    <ul>
+      <li>Antes de salir del teléfono, cada nota, carpeta e imagen se <strong>cifra de extremo a extremo</strong> con AES-256-GCM, con una clave derivada de tu contraseña maestra. El título, el contenido, la carpeta, el color y las fechas van dentro del bloque cifrado.</li>
+      <li>El servidor solo almacena datos ilegibles. Quien lo administre puede ver cuántos ficheros hay, su tamaño aproximado y cuándo cambian, pero no su contenido.</li>
+      <li>Tu usuario y tu contraseña de aplicación se envían a tu servidor para identificarte, igual que en cualquier cliente de Nextcloud.</li>
+    </ul>
+    <p>Si olvidas la contraseña maestra, nadie puede descifrar las notas guardadas en el servidor, tampoco el desarrollador.</p>
+  </section>
+
+  <section>
+    <h2>5. Permisos que usa la app</h2>
+    <table>
+      <tr><th>Permiso</th><th>Para qué se usa</th></tr>
+      <tr><td>Internet y estado de la red</td><td>Sincronizar con tu servidor Nextcloud, solo si la has activado.</td></tr>
+      <tr><td>Biometría</td><td>Desbloquear la app con huella, cara o PIN, si activas el bloqueo. La verificación la hace el sistema Android: la app nunca accede a tus datos biométricos.</td></tr>
+      <tr><td>Ejecutar en segundo plano, mantener el dispositivo activo e iniciar al encender</td><td>Los usa el sistema de tareas de Android (WorkManager) para sincronizar periódicamente con tu Nextcloud, solo si la sincronización está activada.</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>6. Compartir, exportar y copias de seguridad</h2>
+    <ul>
+      <li><strong>Compartir:</strong> cuando envías una nota a otra app, solo se comparte lo que tú eliges y con la app que tú eliges. Lo que esa app haga con ello se rige por su propia política.</li>
+      <li><strong>Recibir contenido:</strong> si compartes texto o fotos desde otra app hacia Mis Notas, solo se usa para crear una nota en tu dispositivo.</li>
+      <li><strong>Exportar:</strong> la copia de seguridad en Markdown se guarda <strong>sin cifrar</strong> en el lugar que tú elijas. Guárdala en un sitio de confianza.</li>
+      <li><strong>Copia en la nube de Google:</strong> las notas y las credenciales están excluidas de la copia de seguridad automática de Android. Al pasar los datos de un móvil a otro con cable o por red local se copian las notas, pero no las credenciales.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>7. Cómo borrar tus datos</h2>
+    <ul>
+      <li><strong>En el teléfono:</strong> desinstalar la app o borrar sus datos desde los ajustes de Android elimina todas las notas, imágenes y credenciales guardadas en el dispositivo.</li>
+      <li><strong>En tu servidor:</strong> las notas sincronizadas están en la carpeta <code>MisNotas</code> de tu Nextcloud. Puedes borrarla cuando quieras desde Nextcloud.</li>
+      <li>Desconectar la cuenta en <em>Ajustes → Sincronización con Nextcloud</em> borra del teléfono el usuario, la contraseña de aplicación y la clave.</li>
+    </ul>
+    <p>Como el desarrollador no guarda ningún dato tuyo, no hay nada que solicitarle para borrar.</p>
+  </section>
+
+  <section>
+    <h2>8. Menores</h2>
+    <p>Mis Notas no está dirigida específicamente a menores y no recoge datos de ningún usuario, de ninguna edad.</p>
+  </section>
+
+  <section>
+    <h2>9. Cambios en esta política</h2>
+    <p>Si la app cambia su forma de tratar los datos, esta página se actualizará y se modificará la fecha de arriba. Los cambios importantes también se indicarán en las notas de la versión correspondiente.</p>
+  </section>
+
+  <footer>Mis Notas · Software libre bajo licencia GNU GPL v3 · <a href="https://github.com/ferlagod/mis_notas">Código fuente</a></footer>
+</main>
+</body>
+</html>
