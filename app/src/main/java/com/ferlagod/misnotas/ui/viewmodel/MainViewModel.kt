@@ -196,6 +196,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun toggleLayoutMode() = appSettings.setGridLayout(!settings.value.gridLayout)
     fun setSortOrder(order: SortOrder) = appSettings.setSortOrder(order)
     fun setThemeMode(mode: ThemeMode) = appSettings.setThemeMode(mode)
+    fun setAmoled(enabled: Boolean) = appSettings.setAmoled(enabled)
     fun setAppLock(enabled: Boolean) = appSettings.setAppLock(enabled)
 
     fun setAutoPurgeTrash(enabled: Boolean) {

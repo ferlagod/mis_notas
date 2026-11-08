@@ -9,7 +9,6 @@
     <string name="cd_back">Zurück</string>
     <string name="cd_settings">Einstellungen</string>
     <string name="cd_toggle_password">Passwort ein- oder ausblenden</string>
-    <string name="folders_title">Ordner</string>
     <string name="cd_lock">Sperren</string>
     <string name="new_folder">Neuer Ordner</string>
     <string name="new_subfolder">Neuer Unterordner</string>
@@ -245,5 +244,18 @@
     <plurals name="notes_moved_to_trash">
         <item quantity="one">Notiz in den Papierkorb verschoben</item>
         <item quantity="other">%d Notizen in den Papierkorb verschoben</item>
+    </plurals>
+    <string name="greeting_morning">Guten Morgen</string>
+    <string name="greeting_afternoon">Guten Tag</string>
+    <string name="greeting_night">Guten Abend</string>
+    <string name="amoled_mode">Reines Schwarz (AMOLED)</string>
+    <string name="amoled_mode_desc">Im dunklen Modus reines Schwarz verwenden, um bei OLED-Displays Akku zu sparen</string>
+    <plurals name="home_notes_count">
+        <item quantity="one">%d Notiz</item>
+        <item quantity="other">%d Notizen</item>
+    </plurals>
+    <plurals name="home_folders_count">
+        <item quantity="one">%d Ordner</item>
+        <item quantity="other">%d Ordner</item>
     </plurals>
 </resources>

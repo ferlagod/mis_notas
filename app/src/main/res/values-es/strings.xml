@@ -9,7 +9,6 @@
     <string name="cd_back">Volver</string>
     <string name="cd_settings">Ajustes</string>
     <string name="cd_toggle_password">Mostrar u ocultar contraseña</string>
-    <string name="folders_title">Carpetas</string>
     <string name="cd_lock">Bloquear</string>
     <string name="new_folder">Nueva carpeta</string>
     <string name="new_subfolder">Nueva subcarpeta</string>
@@ -255,5 +254,20 @@
         <item quantity="one">Nota movida a la papelera</item>
         <item quantity="other">%d notas movidas a la papelera</item>
         <item quantity="many">%d notas movidas a la papelera</item>
+    </plurals>
+    <string name="greeting_morning">Buenos días</string>
+    <string name="greeting_afternoon">Buenas tardes</string>
+    <string name="greeting_night">Buenas noches</string>
+    <string name="amoled_mode">Negro puro (AMOLED)</string>
+    <string name="amoled_mode_desc">En modo oscuro, usa negro puro para ahorrar batería en pantallas OLED</string>
+    <plurals name="home_notes_count">
+        <item quantity="one">%d nota</item>
+        <item quantity="other">%d notas</item>
+        <item quantity="many">%d notas</item>
+    </plurals>
+    <plurals name="home_folders_count">
+        <item quantity="one">%d carpeta</item>
+        <item quantity="other">%d carpetas</item>
+        <item quantity="many">%d carpetas</item>
     </plurals>
 </resources>

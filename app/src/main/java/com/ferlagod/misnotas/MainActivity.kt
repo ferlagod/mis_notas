@@ -109,7 +109,7 @@ class MainActivity : ComponentActivity() {
             }
             LaunchedEffect(settings.appLock) { applyRecentsPrivacy(settings.appLock) }
 
-            MisNotasTheme(darkTheme = darkTheme) {
+            MisNotasTheme(darkTheme = darkTheme, amoled = settings.amoled) {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     Box(modifier = Modifier.fillMaxSize()) {
                         AppNavigationHost(
@@ -357,6 +357,7 @@ private fun AppNavigationHost(
                 onDisconnectNextcloud = viewModel::disconnectNextcloud,
                 onTriggerSync = viewModel::triggerSync,
                 onThemeChange = viewModel::setThemeMode,
+                onAmoledChange = viewModel::setAmoled,
                 onGridLayoutChange = { if (it != settings.gridLayout) viewModel.toggleLayoutMode() },
                 onSortOrderChange = viewModel::setSortOrder,
                 onAutoPurgeChange = viewModel::setAutoPurgeTrash,

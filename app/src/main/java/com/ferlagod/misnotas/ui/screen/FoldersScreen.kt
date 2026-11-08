@@ -10,7 +10,9 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,6 +28,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -58,7 +62,6 @@ import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -68,9 +71,8 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -85,8 +87,10 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -133,7 +137,8 @@ fun FoldersScreen(
     val isDark = isAppInDarkTheme()
     val primary = MaterialTheme.colorScheme.primary
     val focusManager = LocalFocusManager.current
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
+    val listState = rememberLazyListState()
+    val fabExpanded by remember { derivedStateOf { listState.firstVisibleItemIndex == 0 } }
 
     var showCreateFolderDialog by remember { mutableStateOf(false) }
     var parentForNewFolder by remember { mutableStateOf<String?>(null) }
@@ -145,57 +150,49 @@ fun FoldersScreen(
     val countByFolder = remember(notes) { notes.groupingBy { it.folderId }.eachCount() }
 
     Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        topBar = {
-            LargeTopAppBar(
-                title = {
-                    Text(
-                        text = stringResource(R.string.folders_title),
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = (-0.5).sp
-                    )
-                },
-                actions = {
-                    SyncStatusIconButton(
-                        isConfigured = isConfigured,
-                        syncState = syncState,
-                        onClick = { if (isConfigured) onTriggerSync() else onOpenSettings() }
-                    )
-                    if (isConfigured) {
-                        IconButton(onClick = onLockApp) {
-                            Icon(Icons.Rounded.Lock, contentDescription = stringResource(R.string.cd_lock), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                    IconButton(onClick = onOpenSettings) {
-                        Icon(Icons.Rounded.Settings, contentDescription = stringResource(R.string.cd_settings), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    scrolledContainerColor = MaterialTheme.colorScheme.background
-                ),
-                scrollBehavior = scrollBehavior
-            )
-        },
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = onNewNote,
                 icon = { Icon(Icons.Rounded.EditNote, contentDescription = null) },
                 text = { Text(stringResource(R.string.cd_new_note), fontWeight = FontWeight.SemiBold) },
                 containerColor = primary,
-                contentColor = Color.White,
-                expanded = scrollBehavior.state.collapsedFraction < 0.5f
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                expanded = fabExpanded
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 104.dp)
         ) {
+            // Cabecera editorial común a la familia "Mis Apps" (como el inicio de Mis Podcast)
+            item(key = "header") {
+                HomeHeader(
+                    totalNotes = totalNotesCount,
+                    folderCount = folders.size,
+                    actions = {
+                        SyncStatusIconButton(
+                            isConfigured = isConfigured,
+                            syncState = syncState,
+                            onClick = { if (isConfigured) onTriggerSync() else onOpenSettings() }
+                        )
+                        if (isConfigured) {
+                            IconButton(onClick = onLockApp) {
+                                Icon(Icons.Rounded.Lock, contentDescription = stringResource(R.string.cd_lock), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        IconButton(onClick = onOpenSettings) {
+                            Icon(Icons.Rounded.Settings, contentDescription = stringResource(R.string.cd_settings), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                )
+            }
+
             item(key = "search") {
                 GlobalSearchField(
                     query = query,
@@ -368,12 +365,79 @@ fun FoldersScreen(
     }
 }
 
+/**
+ * Cabecera de la pantalla principal: nombre de la app en pequeño, saludo según la hora,
+ * resumen y logo redondo. Mismo esquema que el inicio de Mis Podcast.
+ */
+@Composable
+private fun HomeHeader(
+    totalNotes: Int,
+    folderCount: Int,
+    actions: @Composable () -> Unit
+) {
+    val hour = remember { java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) }
+    val greeting = stringResource(
+        when (hour) {
+            in 6..12 -> R.string.greeting_morning
+            in 13..20 -> R.string.greeting_afternoon
+            else -> R.string.greeting_night
+        }
+    )
+    val summary = pluralStringResource(R.plurals.home_notes_count, totalNotes, totalNotes) +
+        "  ·  " + pluralStringResource(R.plurals.home_folders_count, folderCount, folderCount)
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .statusBarsPadding()
+            .padding(start = 4.dp, top = 4.dp, bottom = 18.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = stringResource(R.string.app_name).uppercase(),
+                style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.2.sp),
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f)
+            )
+            actions()
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = greeting,
+                    style = MaterialTheme.typography.headlineLarge,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = summary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Image(
+                painter = painterResource(R.drawable.ic_logo_round),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .size(54.dp)
+                    .clip(CircleShape)
+                    .border(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), CircleShape)
+            )
+        }
+    }
+}
+
 @Composable
 private fun GroupLabel(text: String, modifier: Modifier = Modifier) {
     Text(
-        text = text,
-        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        text = text.uppercase(),
+        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp),
+        color = MaterialTheme.colorScheme.primary,
         modifier = modifier.padding(start = 12.dp, bottom = 8.dp, top = 4.dp)
     )
 }

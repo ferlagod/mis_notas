@@ -314,7 +314,7 @@ fun NotesScreen(
                 FloatingActionButton(
                     onClick = { actions.onOpenNote(null) },
                     containerColor = primary,
-                    contentColor = Color.White,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
                     shape = CircleShape
                 ) {
                     Icon(

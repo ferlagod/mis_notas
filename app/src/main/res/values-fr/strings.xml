@@ -9,7 +9,6 @@
     <string name="cd_back">Retour</string>
     <string name="cd_settings">Paramètres</string>
     <string name="cd_toggle_password">Afficher ou masquer le mot de passe</string>
-    <string name="folders_title">Dossiers</string>
     <string name="cd_lock">Verrouiller</string>
     <string name="new_folder">Nouveau dossier</string>
     <string name="new_subfolder">Nouveau sous-dossier</string>
@@ -255,5 +254,20 @@
         <item quantity="one">%d note placée dans la corbeille</item>
         <item quantity="other">%d notes placées dans la corbeille</item>
         <item quantity="many">%d notes placées dans la corbeille</item>
+    </plurals>
+    <string name="greeting_morning">Bonjour</string>
+    <string name="greeting_afternoon">Bon après-midi</string>
+    <string name="greeting_night">Bonsoir</string>
+    <string name="amoled_mode">Noir pur (AMOLED)</string>
+    <string name="amoled_mode_desc">En mode sombre, utiliser du noir pur pour économiser la batterie des écrans OLED</string>
+    <plurals name="home_notes_count">
+        <item quantity="one">%d note</item>
+        <item quantity="other">%d notes</item>
+        <item quantity="many">%d notes</item>
+    </plurals>
+    <plurals name="home_folders_count">
+        <item quantity="one">%d dossier</item>
+        <item quantity="other">%d dossiers</item>
+        <item quantity="many">%d dossiers</item>
     </plurals>
 </resources>

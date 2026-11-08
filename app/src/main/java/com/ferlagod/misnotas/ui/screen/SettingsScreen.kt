@@ -39,6 +39,7 @@ import androidx.compose.material.icons.automirrored.rounded.Sort
 import androidx.compose.material.icons.rounded.AutoDelete
 import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.CloudSync
+import androidx.compose.material.icons.rounded.Contrast
 import androidx.compose.material.icons.rounded.DarkMode
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Download
@@ -105,6 +106,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.ferlagod.misnotas.BuildConfig
 import com.ferlagod.misnotas.R
 import com.ferlagod.misnotas.data.local.pref.AppSettings
@@ -136,6 +138,7 @@ fun SettingsScreen(
     onDisconnectNextcloud: () -> Unit,
     onTriggerSync: () -> Unit,
     onThemeChange: (ThemeMode) -> Unit,
+    onAmoledChange: (Boolean) -> Unit,
     onGridLayoutChange: (Boolean) -> Unit,
     onSortOrderChange: (SortOrder) -> Unit,
     onAutoPurgeChange: (Boolean) -> Unit,
@@ -212,6 +215,14 @@ fun SettingsScreen(
                         }
                     }
                 }
+                Divider()
+                SwitchRow(
+                    icon = Icons.Rounded.Contrast,
+                    title = stringResource(R.string.amoled_mode),
+                    subtitle = stringResource(R.string.amoled_mode_desc),
+                    checked = settings.amoled,
+                    onCheckedChange = onAmoledChange
+                )
                 Divider()
                 SwitchRow(
                     icon = Icons.Rounded.GridView,
@@ -336,8 +347,8 @@ private fun backupFileName(): String =
 private fun SectionTitle(text: String) {
     Text(
         text = text.uppercase(),
-        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp),
+        color = MaterialTheme.colorScheme.primary,
         modifier = Modifier.padding(start = 12.dp, top = 22.dp, bottom = 8.dp)
     )
 }
@@ -707,7 +718,7 @@ private fun NextcloudSection(
                 enabled = !isLoading
             ) {
                 if (isLoading) {
-                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                 } else {
                     Text(
                         text = if (isConfigured) stringResource(R.string.update_and_sync) else stringResource(R.string.connect_and_encrypt),

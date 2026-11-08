@@ -20,61 +20,54 @@ import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
 private val LightColorScheme = lightColorScheme(
-    primary = RoyalBlueLight,
+    primary = BrandGreen,
     onPrimary = Color.White,
-    primaryContainer = RoyalBlueLight.copy(alpha = 0.12f),
-    onPrimaryContainer = RoyalBlueLight,
-
+    primaryContainer = BrandGreenContainer,
+    onPrimaryContainer = BrandGreenOnContainer,
     secondary = IndigoSecondary,
     onSecondary = Color.White,
-    secondaryContainer = IndigoSecondary.copy(alpha = 0.12f),
-    onSecondaryContainer = IndigoSecondary,
-
     tertiary = AccentGreen,
     onTertiary = Color.White,
-
     background = BackgroundLight,
     onBackground = TextPrimaryLight,
-
     surface = SurfaceLight,
     onSurface = TextPrimaryLight,
     surfaceVariant = SurfaceVariantLight,
     onSurfaceVariant = TextSecondaryLight,
-
     outline = OutlineLight,
     outlineVariant = TextTertiaryLight,
-
     error = AccentRed,
     onError = Color.White
 )
 
 private val DarkColorScheme = darkColorScheme(
-    primary = RoyalBlueDark,
-    onPrimary = Color.Black,
-    primaryContainer = RoyalBlueDark.copy(alpha = 0.20f),
-    onPrimaryContainer = RoyalBlueDark,
-
+    primary = BrandGreenLight,
+    onPrimary = Color(0xFF1C2E08),
+    primaryContainer = BrandGreenDarkContainer,
+    onPrimaryContainer = Color.White,
     secondary = IndigoSecondaryDark,
-    onSecondary = Color.Black,
-    secondaryContainer = IndigoSecondaryDark.copy(alpha = 0.20f),
-    onSecondaryContainer = IndigoSecondaryDark,
-
+    onSecondary = Color(0xFF283420),
     tertiary = AccentGreen,
     onTertiary = Color.Black,
-
     background = BackgroundDark,
     onBackground = TextPrimaryDark,
-
     surface = SurfaceDark,
     onSurface = TextPrimaryDark,
     surfaceVariant = SurfaceVariantDark,
     onSurfaceVariant = TextSecondaryDark,
-
     outline = OutlineDark,
     outlineVariant = TextTertiaryDark,
-
     error = AccentRed,
     onError = Color.White
+)
+
+/** Negro puro: apaga los píxeles en pantallas OLED. */
+private val AmoledColorScheme = DarkColorScheme.copy(
+    background = BackgroundAmoled,
+    surface = SurfaceAmoled,
+    surfaceVariant = SurfaceVariantAmoled,
+    outline = Color(0xFF2C2C2E),
+    outlineVariant = Color(0xFF1C1C1E)
 )
 
 /** Indica si la app está en modo oscuro (según el tema elegido en Ajustes, no solo el del sistema). */
@@ -88,11 +81,14 @@ fun isAppInDarkTheme(): Boolean = LocalDarkTheme.current
 @Composable
 fun MisNotasTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Desactivado estrictamente para respetar la paleta inspirada en iOS HIG y True OLED
-    @Suppress("UNUSED_PARAMETER") dynamicColor: Boolean = false,
+    amoled: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+    val colorScheme = when {
+        !darkTheme -> LightColorScheme
+        amoled -> AmoledColorScheme
+        else -> DarkColorScheme
+    }
 
     val view = LocalView.current
     if (!view.isInEditMode) {
@@ -108,6 +104,7 @@ fun MisNotasTheme(
         MaterialTheme(
             colorScheme = colorScheme,
             typography = Typography,
+            shapes = Shapes,
             content = content
         )
     }

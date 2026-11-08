@@ -32,6 +32,8 @@ Primera versión pública.
 - Tablas Markdown, enlaces en direcciones web sueltas y visor de imágenes con zoom.
 - Progreso de las listas de tareas en las tarjetas, fechas relativas ("hace 5 min") y estados vacíos ilustrados.
 - Pantalla de Ajustes completa (Apariencia, Privacidad, Notas, Copia de seguridad, Sincronización, Idioma).
+- Diseño de la familia "Mis Apps", compartido con Mis Podcast: tipografías Outfit e Inter, cabecera con saludo según la hora y resumen, secciones con el color de la marca y pantalla de arranque con el verde del logo.
+- Opción de negro puro (AMOLED) para el modo oscuro.
 
 ### Cambiado
 - Todo el contenido de cada nota (también carpeta, color y fechas) va cifrado en un único bloque vinculado a su id.
@@ -42,6 +44,7 @@ Primera versión pública.
 - El icono de la app es ahora el logo de Mis Notas (antes se veía el icono genérico de Android), con versión monocroma para los iconos temáticos.
 - Las notas que se quedan vacías al salir del editor ya no se guardan; si tenían contenido van a la papelera (con "Deshacer").
 - Las carpetas sin color usan el color de acento de la app.
+- El color principal pasa a ser el verde del logo (antes, azul) y el modo oscuro usa gris oscuro por defecto.
 
 ### Corregido
 - Las ediciones se guardan también con el gesto "atrás" y al salir de la app.

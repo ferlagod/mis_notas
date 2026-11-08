@@ -266,7 +266,7 @@ fun LoginScreen(
                         },
                         colors = ButtonDefaults.buttonColors(
                             containerColor = primaryBlue,
-                            contentColor = Color.White
+                            contentColor = MaterialTheme.colorScheme.onPrimary
                         ),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
@@ -276,7 +276,7 @@ fun LoginScreen(
                     ) {
                         if (isLoading) {
                             CircularProgressIndicator(
-                                color = Color.White,
+                                color = MaterialTheme.colorScheme.onPrimary,
                                 modifier = Modifier.size(22.dp),
                                 strokeWidth = 2.dp
                             )

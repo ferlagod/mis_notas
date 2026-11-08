@@ -10,7 +10,6 @@
     <string name="cd_back">Back</string>
     <string name="cd_settings">Settings</string>
     <string name="cd_toggle_password">Show or hide password</string>
-    <string name="folders_title">Folders</string>
     <string name="cd_lock">Lock</string>
     <string name="new_folder">New folder</string>
     <string name="new_subfolder">New subfolder</string>
@@ -246,5 +245,18 @@
     <plurals name="notes_moved_to_trash">
         <item quantity="one">Note moved to trash</item>
         <item quantity="other">%d notes moved to trash</item>
+    </plurals>
+    <string name="greeting_morning">Good morning</string>
+    <string name="greeting_afternoon">Good afternoon</string>
+    <string name="greeting_night">Good evening</string>
+    <string name="amoled_mode">Pure black (AMOLED)</string>
+    <string name="amoled_mode_desc">In dark mode, use pure black to save battery on OLED screens</string>
+    <plurals name="home_notes_count">
+        <item quantity="one">%d note</item>
+        <item quantity="other">%d notes</item>
+    </plurals>
+    <plurals name="home_folders_count">
+        <item quantity="one">%d folder</item>
+        <item quantity="other">%d folders</item>
     </plurals>
 </resources>
