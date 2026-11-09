@@ -151,6 +151,10 @@
         <item quantity="one">(%d file couldn’t be read)</item>
         <item quantity="other">(%d files couldn’t be read)</item>
     </plurals>
+    <plurals name="sync_protected_notes">
+        <item quantity="one">(%d note kept: the server wanted to remove it)</item>
+        <item quantity="other">(%d notes kept: the server wanted to remove them all at once)</item>
+    </plurals>
     <string name="copy_suffix">(copy)</string>
     <string name="import_nothing">No notes were found to import</string>
     <string name="backup_failed">Operation failed: %1$s</string>

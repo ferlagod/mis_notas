@@ -150,6 +150,10 @@
         <item quantity="one">(%d Datei nicht lesbar)</item>
         <item quantity="other">(%d Dateien nicht lesbar)</item>
     </plurals>
+    <plurals name="sync_protected_notes">
+        <item quantity="one">(%d Notiz behalten: der Server wollte sie entfernen)</item>
+        <item quantity="other">(%d Notizen behalten: der Server wollte alle auf einmal entfernen)</item>
+    </plurals>
     <string name="copy_suffix">(Kopie)</string>
     <string name="import_nothing">Keine Notizen zum Importieren gefunden</string>
     <string name="backup_failed">Vorgang fehlgeschlagen: %1$s</string>

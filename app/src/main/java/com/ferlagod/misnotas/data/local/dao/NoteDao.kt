@@ -116,10 +116,19 @@ interface NoteDao {
     suspend fun deletePermanently(id: String)
 
     /**
-     * Olvida los ETags (al conectar una cuenta). En la siguiente sincronización se compara todo:
-     * lo que no tenga cambios locales acepta la versión del servidor (o su borrado) y lo que no
-     * exista en el servidor se sube.
+     * Olvida el estado remoto (al conectar una cuenta o al restaurar la bóveda). Lo que estaba
+     * sincronizado pasa a pendiente de subir: tras reconectar, el dispositivo no sabe si su
+     * versión coincide con la del servidor, así que nunca la acepta a ciegas. Si el servidor
+     * tiene otra versión se conservan ambas ("conflicto"); si tiene una lápida, la nota local
+     * vuelve a subirse en lugar de borrarse.
      */
-    @Query("UPDATE notes SET remoteEtag = NULL")
+    @Query(
+        "UPDATE notes SET remoteEtag = NULL, " +
+            "syncStatus = CASE WHEN syncStatus = 'SYNCED' THEN 'PENDING_UPLOAD' ELSE syncStatus END"
+    )
     suspend fun resetSyncMetadata()
+
+    /** Notas visibles (fuera de la papelera y sin borrado pendiente). */
+    @Query("SELECT COUNT(*) FROM notes WHERE isDeleted = 0 AND syncStatus != 'PENDING_DELETE'")
+    suspend fun countLive(): Int
 }

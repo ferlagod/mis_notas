@@ -145,6 +145,27 @@ object SyncMerger {
             else -> action
         }
 
+    /** Por debajo de este número de notas retiradas en una ronda nunca se frena. */
+    const val MASS_REMOVAL_MIN = 5
+
+    /** A partir de este número de notas retiradas en una ronda siempre se frena. */
+    const val MASS_REMOVAL_ABSOLUTE = 50
+
+    /**
+     * Freno de seguridad: ¿retirar [removed] notas visibles de las [live] que hay en el
+     * dispositivo es tan anómalo que conviene no aplicarlo?
+     *
+     * "Retirar" es borrar o mandar a la papelera una nota que el usuario está viendo porque el
+     * servidor dice que ya no existe (lápida o fichero desaparecido). Pasa con un solo fichero de
+     * vez en cuando, pero en bloque suele indicar una carpeta remota equivocada, vaciada o
+     * restaurada; en ese caso se conservan las notas y se vuelven a subir.
+     *
+     * No cuenta las notas que otro dispositivo mandó a la papelera de forma normal (llegan como
+     * notas en papelera, no como lápidas) ni el vaciado de la papelera.
+     */
+    fun isMassRemoval(removed: Int, live: Int): Boolean =
+        removed >= MASS_REMOVAL_MIN && (removed >= MASS_REMOVAL_ABSOLUTE || removed * 4 >= live)
+
     fun sameNoteContent(a: NoteEntity, b: NoteEntity): Boolean =
         a.title == b.title &&
             a.content == b.content &&

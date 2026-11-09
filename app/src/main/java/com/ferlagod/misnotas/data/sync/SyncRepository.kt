@@ -12,8 +12,10 @@ import android.util.Base64
 import android.util.Log
 import androidx.room.withTransaction
 import com.ferlagod.misnotas.data.attachment.AttachmentStore
+import com.ferlagod.misnotas.data.backup.BackupManager
 import com.ferlagod.misnotas.data.local.AppDatabase
 import com.ferlagod.misnotas.data.local.entity.AttachmentEntity
+import com.ferlagod.misnotas.data.local.entity.NoteEntity
 import com.ferlagod.misnotas.data.local.entity.RemoteTombstoneEntity
 import com.ferlagod.misnotas.data.local.model.NoteContentParser
 import com.ferlagod.misnotas.data.local.model.SyncStatus
@@ -29,6 +31,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONException
 import java.net.SocketTimeoutException
@@ -47,7 +50,16 @@ enum class SyncStage(@StringRes val labelRes: Int) {
 sealed interface SyncState {
     data object Idle : SyncState
     data class Syncing(val stage: SyncStage = SyncStage.CONNECTING) : SyncState
-    data class Success(val timestamp: Long = System.currentTimeMillis(), val warnings: Int = 0) : SyncState
+    /**
+     * @param warnings ficheros remotos que no se pudieron leer.
+     * @param protectedNotes notas que el servidor quería retirar en bloque y se han conservado
+     *   (ver [SyncMerger.isMassRemoval]).
+     */
+    data class Success(
+        val timestamp: Long = System.currentTimeMillis(),
+        val warnings: Int = 0,
+        val protectedNotes: Int = 0
+    ) : SyncState
     data class Error(val message: String, val cause: Throwable? = null) : SyncState
 }
 
@@ -83,6 +95,7 @@ class SyncRepository private constructor(context: Context) {
     @Volatile
     private var rerunRequested = false
     private var warnings = 0
+    private var protectedNotes = 0
 
     companion object {
         private const val TAG = "SyncRepository"
@@ -158,6 +171,10 @@ class SyncRepository private constructor(context: Context) {
     /**
      * Conecta una cuenta: valida credenciales, desbloquea o crea la bóveda y prepara los datos
      * locales para subirse completos en la primera sincronización.
+     *
+     * Antes de tocar nada guarda una copia ZIP de las notas (ver [BackupManager.exportSafetyCopy]).
+     * El estado local se prepara antes de guardar las credenciales y con el cerrojo de la
+     * sincronización tomado, para que ninguna ronda pueda ver la cuenta nueva con el estado viejo.
      */
     suspend fun connectAccount(credentials: NextcloudCredentials, masterPassword: String): Result<Unit> =
         withContext(Dispatchers.IO) {
@@ -166,15 +183,25 @@ class SyncRepository private constructor(context: Context) {
                 client.ensureRootFolder()
                 val (key, _) = vault.unlockRemote(client, masterPassword)
 
-                authPreferences.saveCredentials(credentials.serverUrl, credentials.username, credentials.appPassword)
-                authPreferences.saveDerivedKey(key)
+                try {
+                    val untitled = LanguageManager.localizedContext(appContext).getString(R.string.untitled)
+                    BackupManager(appContext).exportSafetyCopy(untitled)
+                } catch (e: Exception) {
+                    // La copia es una red de seguridad; si falla, la sincronización sigue protegida
+                    // por las reglas de fusión y el freno de borrados masivos.
+                    Log.w(TAG, "No se pudo guardar la copia previa a la sincronización", e)
+                }
 
-                // Puede ser otra cuenta u otra bóveda: se olvida el estado remoto previo.
-                database.withTransaction {
-                    noteDao.resetSyncMetadata()
-                    folderDao.resetSyncMetadata()
-                    attachmentDao.markAllPendingUpload()
-                    tombstoneDao.clear()
+                syncMutex.withLock {
+                    // Puede ser otra cuenta u otra bóveda: se olvida el estado remoto previo.
+                    database.withTransaction {
+                        noteDao.resetSyncMetadata()
+                        folderDao.resetSyncMetadata()
+                        attachmentDao.markAllPendingUpload()
+                        tombstoneDao.clear()
+                    }
+                    authPreferences.saveCredentials(credentials.serverUrl, credentials.username, credentials.appPassword)
+                    authPreferences.saveDerivedKey(key)
                 }
                 Result.success(Unit)
             } catch (e: Exception) {
@@ -203,6 +230,7 @@ class SyncRepository private constructor(context: Context) {
         try {
             val client = createClient(credentials)
             warnings = 0
+            protectedNotes = 0
             var rounds = 0
             do {
                 rerunRequested = false
@@ -212,7 +240,7 @@ class SyncRepository private constructor(context: Context) {
 
             val now = System.currentTimeMillis()
             authPreferences.setLastSync(now)
-            _syncState.value = SyncState.Success(now, warnings)
+            _syncState.value = SyncState.Success(now, warnings, protectedNotes)
             Result.success(Unit)
         } catch (e: Exception) {
             Log.w(TAG, "synchronize", e)
@@ -305,6 +333,9 @@ class SyncRepository private constructor(context: Context) {
         val untitled = res.getString(R.string.untitled)
         val knownTombstones = tombstoneDao.getAll().associate { it.fileName to it.etag }
 
+        // Retiradas de notas visibles: se aplican al final, y solo si no son un borrado en bloque.
+        val pendingRemovals = mutableListOf<PendingRemoval>()
+
         for ((id, meta) in remoteNotes) {
             val local = noteDao.getNoteById(id)
             if (local?.remoteEtag != null && local.remoteEtag == meta.etag) continue
@@ -317,16 +348,11 @@ class SyncRepository private constructor(context: Context) {
 
             database.withTransaction {
                 val current = noteDao.getNoteById(id)
-                when (val action = SyncMerger.resolveNote(current, record, meta.etag, { UUID.randomUUID().toString() }, conflictSuffix, untitled)) {
-                    is MergeAction.SaveRemote -> noteDao.upsertNote(action.entity)
-                    is MergeAction.KeepLocal -> noteDao.setRemoteEtag(id, action.etag)
-                    is MergeAction.Conflict -> {
-                        noteDao.upsertNote(action.main)
-                        noteDao.upsertNote(action.copy)
-                    }
-                    MergeAction.DeleteLocal -> noteDao.deletePermanently(id)
-                    is MergeAction.TrashLocal -> noteDao.trashFromRemote(id, action.etag)
-                    MergeAction.Skip -> Unit
+                val action = SyncMerger.resolveNote(current, record, meta.etag, { UUID.randomUUID().toString() }, conflictSuffix, untitled)
+                if (current != null && !current.isDeleted && (action is MergeAction.DeleteLocal || action is MergeAction.TrashLocal)) {
+                    pendingRemovals += PendingRemoval.Tombstone(id, record, meta.etag)
+                } else {
+                    applyNoteAction(id, action)
                 }
             }
         }
@@ -334,15 +360,71 @@ class SyncRepository private constructor(context: Context) {
         for (local in noteDao.getAll()) {
             if (local.id in remoteNotes) continue
             when (SyncMerger.resolveMissingRemoteNote(local.syncStatus, local.remoteEtag)) {
-                MissingRemoteAction.TRASH_AND_REUPLOAD -> {
-                    Log.w(TAG, "La nota ${local.id} desapareció del servidor sin lápida; se mueve a la papelera")
-                    noteDao.trashForReupload(local.id)
-                }
+                MissingRemoteAction.TRASH_AND_REUPLOAD ->
+                    if (local.isDeleted) noteDao.trashForReupload(local.id)
+                    else pendingRemovals += PendingRemoval.Missing(local.id)
                 MissingRemoteAction.DELETE_LOCAL -> noteDao.deletePermanently(local.id)
                 MissingRemoteAction.MARK_FOR_UPLOAD -> noteDao.updateSyncStatus(local.id, SyncStatus.PENDING_UPLOAD)
                 MissingRemoteAction.FORGET_ETAG -> noteDao.setRemoteEtag(local.id, null)
                 MissingRemoteAction.NOTHING -> Unit
             }
+        }
+
+        if (pendingRemovals.isEmpty()) return
+
+        if (SyncMerger.isMassRemoval(pendingRemovals.size, noteDao.countLive())) {
+            Log.w(TAG, "El servidor retiraría ${pendingRemovals.size} notas a la vez; se conservan y se vuelven a subir")
+            database.withTransaction {
+                for (removal in pendingRemovals) {
+                    val current = noteDao.getNoteById(removal.id) ?: continue
+                    if (current.syncStatus == SyncStatus.PENDING_DELETE) continue
+                    // Con el ETag de la lápida, la subida la sobrescribe; sin fichero, se crea de nuevo.
+                    val etag = (removal as? PendingRemoval.Tombstone)?.etag
+                    noteDao.setRemoteEtag(removal.id, etag)
+                    noteDao.updateSyncStatus(removal.id, SyncStatus.PENDING_UPLOAD)
+                }
+            }
+            protectedNotes += pendingRemovals.size
+            return
+        }
+
+        for (removal in pendingRemovals) {
+            database.withTransaction {
+                // Se vuelve a decidir con el estado actual: la nota pudo editarse durante la descarga.
+                val current = noteDao.getNoteById(removal.id) ?: return@withTransaction
+                when (removal) {
+                    is PendingRemoval.Tombstone -> applyNoteAction(
+                        removal.id,
+                        SyncMerger.resolveNote(current, removal.record, removal.etag, { UUID.randomUUID().toString() }, conflictSuffix, untitled)
+                    )
+                    is PendingRemoval.Missing ->
+                        if (SyncMerger.resolveMissingRemoteNote(current.syncStatus, current.remoteEtag) == MissingRemoteAction.TRASH_AND_REUPLOAD) {
+                            Log.w(TAG, "La nota ${current.id} desapareció del servidor sin lápida; se mueve a la papelera")
+                            noteDao.trashForReupload(current.id)
+                        }
+                }
+            }
+        }
+    }
+
+    /** Nota visible que el servidor quiere retirar; se decide al final de [pullNotes]. */
+    private sealed interface PendingRemoval {
+        val id: String
+        class Tombstone(override val id: String, val record: RemoteRecord<NoteEntity>, val etag: String?) : PendingRemoval
+        class Missing(override val id: String) : PendingRemoval
+    }
+
+    private suspend fun applyNoteAction(id: String, action: MergeAction<NoteEntity>) {
+        when (action) {
+            is MergeAction.SaveRemote -> noteDao.upsertNote(action.entity)
+            is MergeAction.KeepLocal -> noteDao.setRemoteEtag(id, action.etag)
+            is MergeAction.Conflict -> {
+                noteDao.upsertNote(action.main)
+                noteDao.upsertNote(action.copy)
+            }
+            MergeAction.DeleteLocal -> noteDao.deletePermanently(id)
+            is MergeAction.TrashLocal -> noteDao.trashFromRemote(id, action.etag)
+            MergeAction.Skip -> Unit
         }
     }
 

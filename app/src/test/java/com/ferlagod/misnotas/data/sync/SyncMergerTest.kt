@@ -8,6 +8,7 @@ import com.ferlagod.misnotas.data.local.entity.FolderEntity
 import com.ferlagod.misnotas.data.local.entity.NoteEntity
 import com.ferlagod.misnotas.data.local.model.SyncStatus
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -122,5 +123,51 @@ class SyncMergerTest {
         val older = RemoteRecord.Live(FolderEntity(id = "f", name = "remota", updatedAt = 50))
         assertTrue(SyncMerger.resolveFolder(local, newer, "e") is MergeAction.SaveRemote)
         assertEquals(MergeAction.KeepLocal("e"), SyncMerger.resolveFolder(local, older, "e"))
+    }
+
+    // --- Tras reconectar (resetSyncMetadata deja lo sincronizado como PENDING_UPLOAD sin ETag) ---
+
+    @Test
+    fun afterReconnect_verifiedTombstoneDoesNotDeleteLocalNote() {
+        val local = note(status = SyncStatus.PENDING_UPLOAD, etag = null)
+        val action = SyncMerger.resolveNote(local, RemoteRecord.Tombstone("n1", 1, verified = true), "e2", newId)
+        assertEquals(MergeAction.KeepLocal("e2"), action)
+    }
+
+    @Test
+    fun afterReconnect_differentRemoteVersionKeepsBoth() {
+        val local = note(content = "local", updatedAt = 100, status = SyncStatus.PENDING_UPLOAD, etag = null)
+        val action = SyncMerger.resolveNote(local, live(note(content = "remoto", updatedAt = 200)), "e2", newId)
+        assertTrue(action is MergeAction.Conflict)
+    }
+
+    @Test
+    fun afterReconnect_missingRemoteNoteIsKept() {
+        assertEquals(MissingRemoteAction.NOTHING, SyncMerger.resolveMissingRemoteNote(SyncStatus.PENDING_UPLOAD, null))
+    }
+
+    // --- Freno de borrados masivos ---
+
+    @Test
+    fun massRemoval_fewNotesNeverBlock() {
+        assertFalse(SyncMerger.isMassRemoval(removed = 1, live = 1))
+        assertFalse(SyncMerger.isMassRemoval(removed = 4, live = 4))
+    }
+
+    @Test
+    fun massRemoval_largeShareBlocks() {
+        assertTrue(SyncMerger.isMassRemoval(removed = 114, live = 114))
+        assertTrue(SyncMerger.isMassRemoval(removed = 5, live = 20))
+    }
+
+    @Test
+    fun massRemoval_smallShareOfManyNotesIsAllowed() {
+        assertFalse(SyncMerger.isMassRemoval(removed = 5, live = 21))
+        assertFalse(SyncMerger.isMassRemoval(removed = 49, live = 1000))
+    }
+
+    @Test
+    fun massRemoval_absoluteLimitAlwaysBlocks() {
+        assertTrue(SyncMerger.isMassRemoval(removed = 50, live = 10_000))
     }
 }

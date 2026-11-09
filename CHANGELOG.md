@@ -2,6 +2,16 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); versiones según [SemVer](https://semver.org/lang/es/).
 
+## [Sin publicar]
+
+### Añadido
+- Copia de seguridad automática en ZIP al conectar una cuenta de Nextcloud, antes de la primera sincronización (en `Descargas/MisNotas`; en Android 8-9, en la carpeta de la app).
+- Freno ante borrados masivos: si el servidor quiere borrar o mandar a la papelera de golpe muchas notas visibles, se conservan, se vuelven a subir y se avisa en Ajustes.
+
+### Corregido
+- Al reconectar una cuenta, las notas que ya estaban sincronizadas podían sobrescribirse con la versión del servidor o borrarse si allí había una lápida. Ahora se tratan como cambios locales: si difieren se conservan ambas versiones.
+- Una sincronización en segundo plano ya no puede colarse mientras se conecta una cuenta.
+
 ## [1.0.0] - 2026-11-08
 
 Primera versión pública.

@@ -4,7 +4,11 @@
 
 package com.ferlagod.misnotas.data.backup
 
+import android.content.ContentValues
 import android.content.Context
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.room.withTransaction
@@ -19,6 +23,12 @@ import com.ferlagod.misnotas.ui.theme.NoteColor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.FileOutputStream
+import java.io.OutputStream
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.io.IOException
 import java.io.InputStream
 import java.util.UUID
@@ -51,12 +61,61 @@ class BackupManager(context: Context) {
 
     /** Escribe la copia en [uri] (creado con ACTION_CREATE_DOCUMENT). Devuelve el número de notas. */
     suspend fun exportZip(uri: Uri, untitled: String): Int = withContext(Dispatchers.IO) {
+        val output = appContext.contentResolver.openOutputStream(uri)
+            ?: throw IOException("Cannot open $uri")
+        writeZip(output, untitled)
+    }
+
+    /**
+     * Copia de seguridad automática antes de conectar una cuenta (la primera sincronización
+     * fusiona las notas del dispositivo con las del servidor). Se guarda en Descargas/MisNotas
+     * en Android 10+, y en Android/data/com.ferlagod.misnotas/files/Documents en versiones
+     * anteriores. Sin notas no se crea nada.
+     *
+     * @return dónde se ha guardado, o null si no había nada que copiar.
+     */
+    suspend fun exportSafetyCopy(untitled: String): String? = withContext(Dispatchers.IO) {
+        if (noteDao.countLive() == 0) return@withContext null
+        val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.ROOT).format(Date())
+        val fileName = "MisNotas-backup-$stamp.zip"
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val resolver = appContext.contentResolver
+            val values = ContentValues().apply {
+                put(MediaStore.Downloads.DISPLAY_NAME, fileName)
+                put(MediaStore.Downloads.MIME_TYPE, "application/zip")
+                put(MediaStore.Downloads.RELATIVE_PATH, "${Environment.DIRECTORY_DOWNLOADS}/$SAFETY_DIR")
+                put(MediaStore.Downloads.IS_PENDING, 1)
+            }
+            val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                ?: throw IOException("Cannot create $fileName")
+            try {
+                writeZip(resolver.openOutputStream(uri) ?: throw IOException("Cannot open $uri"), untitled)
+                resolver.update(uri, ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) }, null, null)
+            } catch (e: Exception) {
+                resolver.delete(uri, null, null)
+                throw e
+            }
+            "${Environment.DIRECTORY_DOWNLOADS}/$SAFETY_DIR/$fileName"
+        } else {
+            val dir = appContext.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS)
+                ?: throw IOException("External storage not available")
+            val file = File(dir, fileName)
+            try {
+                writeZip(FileOutputStream(file), untitled)
+            } catch (e: Exception) {
+                file.delete()
+                throw e
+            }
+            file.absolutePath
+        }
+    }
+
+    /** Escribe todas las notas visibles como ZIP en [output] (lo cierra). Devuelve el número de notas. */
+    private suspend fun writeZip(output: OutputStream, untitled: String): Int {
         val notes = noteDao.getAll().filter { !it.isDeleted && it.syncStatus != SyncStatus.PENDING_DELETE }
         val folders = folderDao.getAll().filter { !it.isDeleted }
         val foldersById = folders.associateBy { it.id }
-
-        val output = appContext.contentResolver.openOutputStream(uri)
-            ?: throw IOException("Cannot open $uri")
 
         ZipOutputStream(output.buffered()).use { zip ->
             val takenByDir = HashMap<String, MutableSet<String>>()
@@ -88,7 +147,7 @@ class BackupManager(context: Context) {
                 zip.closeEntry()
             }
         }
-        notes.size
+        return notes.size
     }
 
     private suspend fun extensionFor(id: String): String =
@@ -267,6 +326,7 @@ class BackupManager(context: Context) {
 
     companion object {
         const val ATTACHMENTS_DIR = "attachments"
+        private const val SAFETY_DIR = "MisNotas"
         private const val MAX_NOTE_BYTES = 10L * 1024 * 1024
         private const val MAX_ENTRY_BYTES = 30L * 1024 * 1024
         private const val MAX_ZIP_BYTES = 500L * 1024 * 1024

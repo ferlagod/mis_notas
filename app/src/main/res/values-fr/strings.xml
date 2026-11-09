@@ -154,6 +154,11 @@
         <item quantity="many">(%d fichiers illisibles)</item>
         <item quantity="other">(%d fichiers illisibles)</item>
     </plurals>
+    <plurals name="sync_protected_notes">
+        <item quantity="one">(%d note conservée : le serveur voulait la retirer)</item>
+        <item quantity="many">(%d notes conservées : le serveur voulait toutes les retirer d’un coup)</item>
+        <item quantity="other">(%d notes conservées : le serveur voulait toutes les retirer d’un coup)</item>
+    </plurals>
     <string name="copy_suffix">(copie)</string>
     <string name="import_nothing">Aucune note à importer n’a été trouvée</string>
     <string name="backup_failed">Échec de l’opération : %1$s</string>

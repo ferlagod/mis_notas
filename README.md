@@ -96,6 +96,8 @@ Detalles técnicos en [SECURITY.md](SECURITY.md) y en el [formato de sincronizac
 - **Conflictos**: si la misma nota cambió en dos sitios, se queda la versión más reciente y la otra se guarda como una nota nueva con el título "… (conflicto)".
 - **Borrados**: la papelera se sincroniza entre dispositivos. Al vaciarla, la app deja en el servidor una "lápida" para que el resto de dispositivos también la borren.
 - Al eliminar una carpeta, sus notas pasan a "Todas las notas" y sus subcarpetas suben un nivel.
+- **Freno ante borrados masivos**: si en una sincronización el servidor quiere borrar o mandar a la papelera de golpe muchas notas (5 o más y al menos una cuarta parte de las que tienes, o 50 o más), la app no lo aplica: conserva las notas, las vuelve a subir y lo indica en Ajustes. Suele pasar si la carpeta del servidor se ha vaciado o es otra.
+- **Copia antes de conectar**: al conectar una cuenta, la app guarda primero un ZIP con todas tus notas en `Descargas/MisNotas` (en Android 8 y 9, en `Android/data/com.ferlagod.misnotas/files/Documents`). Se puede importar desde Ajustes.
 
 ## Compilar desde el código
 
