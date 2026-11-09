@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/logo.png" alt="Mis Notas" width="140">
+  <img src="capturas/Grafico%20de%20funciones.jpeg" alt="Mis Notas" width="100%">
 </p>
 
 <h1 align="center">Mis Notas</h1>
@@ -17,6 +17,21 @@
 ---
 
 Mis Notas combina el aspecto limpio de Apple Notas y Google Keep con la organización por carpetas y el Markdown de apps como Joplin o Notesnook. Tus notas viven en el teléfono, y si quieres se sincronizan **cifradas** con tu servidor Nextcloud: el servidor solo guarda datos ilegibles.
+
+## Capturas
+
+<table align="center">
+  <tr>
+    <td align="center"><img src="capturas/Principal.png" alt="Pantalla principal" width="220"><br><sub><b>Inicio</b>: vistas rápidas y carpetas</sub></td>
+    <td align="center"><img src="capturas/Todas%20las%20notas.png" alt="Todas las notas" width="220"><br><sub><b>Notas</b>: cuadrícula, búsqueda y progreso de tareas</sub></td>
+    <td align="center"><img src="capturas/Nota.png" alt="Nota abierta" width="220"><br><sub><b>Nota</b>: Markdown con listas y tareas</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="capturas/Ajustes1.png" alt="Ajustes de apariencia y privacidad" width="220"><br><sub><b>Ajustes</b>: tema, AMOLED, bloqueo y papelera</sub></td>
+    <td align="center"><img src="capturas/Ajustes2.png" alt="Sincronización con Nextcloud" width="220"><br><sub><b>Sincronización</b>: Nextcloud con cifrado E2EE</sub></td>
+    <td></td>
+  </tr>
+</table>
 
 ## Características
 
