@@ -52,6 +52,8 @@
     <string name="reset_account">Reset / disconnect account</string>
     <string name="image_add_failed">Couldn’t add the image</string>
     <string name="image_alt">image</string>
+    <string name="image_size_title">Image size</string>
+    <string name="image_size_fit">Fit to screen</string>
     <string name="edited_at">Edited %1$s</string>
     <string name="cd_edit_mode">Edit mode</string>
     <string name="cd_read_mode">Reading mode</string>

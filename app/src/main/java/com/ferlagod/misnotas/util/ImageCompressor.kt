@@ -49,13 +49,15 @@ object ImageCompressor {
     ): ByteArray {
         val contentResolver = context.contentResolver
 
-        // 1. Decodificar solo límites para calcular sample size eficiente
+        // 1. Decodificar solo límites para calcular sample size eficiente.
+        // Con inJustDecodeBounds, decodeStream devuelve siempre null: el resultado útil está en
+        // boundsOptions, así que solo se comprueba que el stream se haya podido abrir.
         val boundsOptions = BitmapFactory.Options().apply {
             inJustDecodeBounds = true
         }
-        contentResolver.openInputStream(uri)?.use { stream ->
-            BitmapFactory.decodeStream(stream, null, boundsOptions)
-        } ?: throw IllegalArgumentException("No se pudo abrir el stream para la URI: $uri")
+        val stream = contentResolver.openInputStream(uri)
+            ?: throw IllegalArgumentException("No se pudo abrir el stream para la URI: $uri")
+        stream.use { BitmapFactory.decodeStream(it, null, boundsOptions) }
 
         val originalWidth = boundsOptions.outWidth
         val originalHeight = boundsOptions.outHeight

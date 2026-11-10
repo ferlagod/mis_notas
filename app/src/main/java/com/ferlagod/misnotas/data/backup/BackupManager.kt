@@ -13,6 +13,7 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.room.withTransaction
 import com.ferlagod.misnotas.data.attachment.AttachmentStore
+import com.ferlagod.misnotas.ui.markdown.ImageSizing
 import com.ferlagod.misnotas.data.local.AppDatabase
 import com.ferlagod.misnotas.data.local.entity.AttachmentEntity
 import com.ferlagod.misnotas.data.local.entity.FolderEntity
@@ -221,9 +222,12 @@ class BackupManager(context: Context) {
             val parsed = MarkdownFile.parse(bytes.toString(Charsets.UTF_8), fileName.substringBeforeLast('.'))
 
             // 1) Imágenes locales del ZIP referenciadas por la nota → adjuntos.
-            fun resolve(target: String): String? =
-                if (target.contains("://") || target.startsWith("data:")) null
-                else normalizePath((dirSegments + target.split('/')).joinToString("/"))?.takeIf { it in entries }
+            // El tamaño de la imagen (`#w=50`, ver ImageSizing) no forma parte de la ruta.
+            fun resolve(target: String): String? {
+                val path = ImageSizing.stripSize(target)
+                return if (path.contains("://") || path.startsWith("data:")) null
+                else normalizePath((dirSegments + path.split('/')).joinToString("/"))?.takeIf { it in entries }
+            }
 
             for (match in IMAGE_LINK.findAll(parsed.content)) {
                 val resolved = resolve(match.groupValues[2]) ?: continue
@@ -234,7 +238,8 @@ class BackupManager(context: Context) {
             // 2) Se reescriben los enlaces a `attachment://<id>`.
             val content = IMAGE_LINK.replace(parsed.content) { match ->
                 val id = resolve(match.groupValues[2])?.let { importedAttachments[it] }
-                if (id == null) match.value else "![${match.groupValues[1]}](${AttachmentStore.reference(id)})"
+                if (id == null) match.value
+                else "![${match.groupValues[1]}](${ImageSizing.withSize(AttachmentStore.reference(id), ImageSizing.widthPercent(match.groupValues[2]))})"
             }
 
             val folderId = try {

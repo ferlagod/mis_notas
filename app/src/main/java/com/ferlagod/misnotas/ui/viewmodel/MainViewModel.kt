@@ -35,6 +35,8 @@ import com.ferlagod.misnotas.util.ImageCompressor
 import com.ferlagod.misnotas.util.LanguageManager
 import com.ferlagod.misnotas.util.TextSearch
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -668,7 +670,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     suspend fun addImageAttachment(uri: Uri): String {
         val bytes = ImageCompressor.compressImage(getApplication(), uri)
         val id = UUID.randomUUID().toString()
-        attachmentStore.write(id, bytes)
+        // La escritura del fichero no debe bloquear el hilo principal (se llama desde la UI).
+        withContext(Dispatchers.IO) { attachmentStore.write(id, bytes) }
         attachmentDao.upsert(
             AttachmentEntity(id = id, mimeType = ImageCompressor.MIME_TYPE, size = bytes.size.toLong())
         )

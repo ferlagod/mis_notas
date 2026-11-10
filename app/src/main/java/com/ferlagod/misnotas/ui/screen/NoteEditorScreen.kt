@@ -26,6 +26,7 @@ import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -81,6 +82,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -131,7 +133,10 @@ import com.ferlagod.misnotas.ui.components.ColorPalette
 import com.ferlagod.misnotas.ui.components.FolderPickerDialog
 import com.ferlagod.misnotas.ui.components.ZoomableImageDialog
 import com.ferlagod.misnotas.data.local.model.SyncStatus
+import com.ferlagod.misnotas.ui.markdown.ImageSizing
 import com.ferlagod.misnotas.ui.markdown.InlineKind
+import com.ferlagod.misnotas.ui.markdown.NoteImage
+import com.ferlagod.misnotas.ui.markdown.rememberImageModel
 import com.ferlagod.misnotas.ui.markdown.InlineToken
 import com.ferlagod.misnotas.ui.markdown.LinePrefix
 import com.ferlagod.misnotas.ui.markdown.LivePreviewTransformation
@@ -165,6 +170,7 @@ import com.ferlagod.misnotas.ui.theme.isAppInDarkTheme
 import com.ferlagod.misnotas.ui.theme.toEditorBackground
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -281,6 +287,8 @@ fun NoteEditorScreen(
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
     var viewerImage by remember { mutableStateOf<Any?>(null) }
+    /** Imagen cuyo tamaño se está cambiando (tramo que ocupa en el Markdown). */
+    var imageResize by remember { mutableStateOf<ImageResizeState?>(null) }
 
     val history = remember { EditHistory() }
     val bodyFocus = remember { FocusRequester() }
@@ -470,10 +478,34 @@ fun NoteEditorScreen(
         }
     }
 
-    /** Toque en la casilla de una tarea dentro del editor: la marca o desmarca. */
+    /** Abre el diálogo de tamaño para la imagen Markdown del tramo [start, end) del texto. */
+    fun openImageResize(start: Int, end: Int) {
+        val text = textValue.text
+        if (start < 0 || end > text.length || start >= end) return
+        val snippet = text.substring(start, end)
+        val source = Regex("""!\[.*?]\((.*?)\)""").find(snippet)?.groupValues?.get(1) ?: return
+        imageResize = ImageResizeState(start, snippet, source)
+    }
+
+    /** Toque en la casilla de una tarea (la marca o desmarca) o en una imagen (cambia su tamaño). */
     fun onBodyTap(position: Offset): Boolean {
         val layout = bodyLayout ?: return false
         val rendered = docCache.get(textValue.text)
+        val displayLength = layout.layoutInput.text.length
+        for (token in rendered.presentation.inlineTokens) {
+            if (token.kind != InlineKind.IMAGE) continue
+            val dStart = rendered.mapping.toDisplay(token.start)
+            val dEnd = rendered.mapping.toDisplay(token.end)
+            if (dEnd <= dStart || dEnd > displayLength) continue
+            val offset = layout.getOffsetForPosition(position)
+            val last = layout.getBoundingBox(dEnd - 1)
+            val inside = offset in dStart until dEnd ||
+                (offset == dEnd && position.x <= last.right && position.y in last.top..last.bottom)
+            if (inside) {
+                openImageResize(token.start, token.end)
+                return true
+            }
+        }
         val slop = 12f * context.resources.displayMetrics.density
         for (box in rendered.presentation.tasks) {
             val displayOffset = rendered.mapping.toDisplay(box.markerStart)
@@ -513,7 +545,8 @@ fun NoteEditorScreen(
                     references += onAddImage(uri)
                 } catch (e: kotlinx.coroutines.CancellationException) {
                     throw e
-                } catch (_: Exception) {
+                } catch (e: Exception) {
+                    android.util.Log.w("NoteEditor", "No se pudo añadir la imagen $uri", e)
                     Toast.makeText(context, imageAddFailed, Toast.LENGTH_SHORT).show()
                 }
             }
@@ -761,7 +794,20 @@ fun NoteEditorScreen(
                             onToggleChecklist = { lineIndex ->
                                 updateBody(TextFieldValue(toggleTaskLine(textValue.text, lineIndex)), forceHistory = true)
                             },
-                            onImageClick = { viewerImage = it }
+                            onImageClick = { viewerImage = it },
+                            onImageLongClick = { lineIndex, _ ->
+                                val text = textValue.text
+                                var lineStart = 0
+                                var ok = true
+                                repeat(lineIndex) {
+                                    val nl = text.indexOf('\n', lineStart)
+                                    if (nl == -1) ok = false else lineStart = nl + 1
+                                }
+                                if (ok) {
+                                    val lineEnd = text.indexOf('\n', lineStart).let { if (it == -1) text.length else it }
+                                    openImageResize(lineStart, lineEnd)
+                                }
+                            }
                         )
                     }
                 } else {
@@ -875,6 +921,26 @@ fun NoteEditorScreen(
         ZoomableImageDialog(model = model, onDismiss = { viewerImage = null })
     }
 
+    imageResize?.let { state ->
+        ImageSizeDialog(
+            source = state.source,
+            onDismiss = { imageResize = null },
+            onConfirm = { percent ->
+                imageResize = null
+                val text = textValue.text
+                // Por si el texto cambió mientras el diálogo estaba abierto (p. ej. una sincronización).
+                val start = if (text.startsWith(state.snippet, state.start)) state.start else text.indexOf(state.snippet)
+                if (start >= 0) {
+                    val resized = ImageSizing.resizeAt(text, start, start + state.snippet.length, percent)
+                    if (resized != text) {
+                        val cursor = textValue.selection.start.coerceAtMost(resized.length)
+                        updateBody(TextFieldValue(resized, TextRange(cursor)), forceHistory = true)
+                    }
+                }
+            }
+        )
+    }
+
     linkDialog?.let { state ->
         LinkDialog(
             state = state,
@@ -893,6 +959,70 @@ fun NoteEditorScreen(
             }
         )
     }
+}
+
+/** Imagen cuyo tamaño se cambia: dónde empieza, su Markdown completo y su dirección. */
+private data class ImageResizeState(val start: Int, val snippet: String, val source: String)
+
+/**
+ * Diálogo para cambiar el ancho de una imagen de la nota, con vista previa. El 100 % la adapta
+ * al ancho de la pantalla (el tamaño inicial de todas las imágenes).
+ */
+@Composable
+private fun ImageSizeDialog(
+    source: String,
+    onDismiss: () -> Unit,
+    onConfirm: (percent: Int) -> Unit
+) {
+    val model = rememberImageModel(source)
+    var percent by remember { mutableIntStateOf(ImageSizing.widthPercent(source)) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.image_size_title), fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (model != null) {
+                    NoteImage(
+                        model = model,
+                        contentDescription = null,
+                        widthPercent = percent,
+                        maxHeightFraction = 0.35f
+                    )
+                }
+                Text(
+                    text = if (percent >= ImageSizing.DEFAULT_PERCENT) stringResource(R.string.image_size_fit) else "$percent %",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                )
+                Slider(
+                    value = percent.toFloat(),
+                    onValueChange = { percent = (it / 5f).roundToInt() * 5 },
+                    valueRange = ImageSizing.MIN_PERCENT.toFloat()..ImageSizing.DEFAULT_PERCENT.toFloat(),
+                    steps = (ImageSizing.DEFAULT_PERCENT - ImageSizing.MIN_PERCENT) / 5 - 1
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    listOf(25, 50, 75, 100).forEach { preset ->
+                        TextButton(onClick = { percent = preset }, contentPadding = PaddingValues(horizontal = 6.dp)) {
+                            Text(
+                                text = "$preset %",
+                                fontWeight = if (percent == preset) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(percent) }) { Text(stringResource(R.string.save)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+        }
+    )
 }
 
 /** Datos del diálogo de enlace: texto, dirección y el enlace que se edita (si ya existía). */

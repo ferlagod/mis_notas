@@ -293,7 +293,9 @@ object MarkdownPresenter {
             when (t.kind) {
                 InlineKind.IMAGE -> {
                     val alt = text.substring(t.contentStart, t.contentEnd).trim()
-                    reps += Replacement(t.start, t.end, "🖼 " + alt.ifEmpty { imageLabel }, ReplacementKind.ATOMIC)
+                    val percent = t.url?.let { ImageSizing.widthPercent(it) } ?: ImageSizing.DEFAULT_PERCENT
+                    val size = if (percent < ImageSizing.DEFAULT_PERCENT) " · $percent%" else ""
+                    reps += Replacement(t.start, t.end, "🖼 " + alt.ifEmpty { imageLabel } + size, ReplacementKind.ATOMIC)
                     styles += StyleRange(t.start, t.end, MdStyle.IMAGE)
                 }
                 InlineKind.AUTOLINK -> styles += StyleRange(t.start, t.end, MdStyle.LINK, url = t.url)

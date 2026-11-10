@@ -4,8 +4,10 @@
 
 package com.ferlagod.misnotas.ui.markdown
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -36,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -59,7 +62,7 @@ private sealed interface MdBlock {
     data class Bullet(val text: String, val indent: Int) : MdBlock
     data class Numbered(val number: String, val text: String, val indent: Int) : MdBlock
     data class Code(val text: String) : MdBlock
-    data class Image(val alt: String, val source: String) : MdBlock
+    data class Image(val lineIndex: Int, val alt: String, val source: String) : MdBlock
     data class Table(val header: List<String>, val rows: List<List<String>>) : MdBlock
     data object Rule : MdBlock
     data object Blank : MdBlock
@@ -114,7 +117,7 @@ private fun parseBlocks(markdown: String): List<MdBlock> {
             }
             IMAGE_REGEX.matches(line) -> {
                 val m = IMAGE_REGEX.find(line)!!
-                blocks += MdBlock.Image(m.groupValues[1], m.groupValues[2])
+                blocks += MdBlock.Image(i, m.groupValues[1], m.groupValues[2])
             }
             TASK_REGEX.matches(line) -> {
                 val m = TASK_REGEX.find(line)!!
@@ -153,10 +156,12 @@ fun toggleTaskLine(markdown: String, lineIndex: Int): String {
 fun rememberImageModel(source: String): Any? {
     val context = LocalContext.current
     return remember(source) {
+        // La indicación de tamaño (`#w=50`) no forma parte de la dirección de la imagen.
+        val address = ImageSizing.stripSize(source)
         when {
-            source.startsWith(AttachmentStore.SCHEME) ->
-                AttachmentStore.fileFor(context, source.removePrefix(AttachmentStore.SCHEME))
-            source.startsWith("data:image/") || source.startsWith("https://") || source.startsWith("http://") -> source
+            address.startsWith(AttachmentStore.SCHEME) ->
+                AttachmentStore.fileFor(context, address.removePrefix(AttachmentStore.SCHEME))
+            address.startsWith("data:image/") || address.startsWith("https://") || address.startsWith("http://") -> address
             else -> null
         }
     }
@@ -170,7 +175,9 @@ fun MarkdownReader(
     markdownText: String,
     primaryBlue: Color,
     onToggleChecklist: (lineIndex: Int) -> Unit,
-    onImageClick: ((Any) -> Unit)? = null
+    onImageClick: ((Any) -> Unit)? = null,
+    /** Pulsación larga en una imagen (para cambiar su tamaño): línea que ocupa y su dirección. */
+    onImageLongClick: ((lineIndex: Int, source: String) -> Unit)? = null
 ) {
     val blocks = remember(markdownText) { parseBlocks(markdownText) }
     val linkColor = primaryBlue
@@ -272,16 +279,12 @@ fun MarkdownReader(
                 is MdBlock.Image -> {
                     val model = rememberImageModel(block.source)
                     if (model != null) {
-                        AsyncImage(
+                        NoteImage(
                             model = model,
                             contentDescription = block.alt.ifBlank { null },
-                            contentScale = ContentScale.FillWidth,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(max = 480.dp)
-                                .padding(vertical = 8.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .then(if (onImageClick != null) Modifier.clickable { onImageClick(model) } else Modifier)
+                            widthPercent = ImageSizing.widthPercent(block.source),
+                            onClick = onImageClick?.let { click -> { click(model) } },
+                            onLongClick = onImageLongClick?.let { longClick -> { longClick(block.lineIndex, block.source) } }
                         )
                     }
                 }
@@ -298,6 +301,46 @@ fun MarkdownReader(
                 is MdBlock.Table -> MarkdownTable(block, linkColor)
             }
         }
+    }
+}
+
+/**
+ * Imagen de una nota: por defecto ocupa el ancho disponible (adaptada a la pantalla) y como
+ * mucho el 75 % del alto de la pantalla, sin recortarse. [widthPercent] la hace más estrecha.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun NoteImage(
+    model: Any,
+    contentDescription: String?,
+    widthPercent: Int,
+    modifier: Modifier = Modifier,
+    /** Alto máximo, como fracción del alto de la pantalla. */
+    maxHeightFraction: Float = 0.75f,
+    onClick: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null
+) {
+    val maxHeight = (LocalConfiguration.current.screenHeightDp * maxHeightFraction).dp
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        AsyncImage(
+            model = model,
+            contentDescription = contentDescription,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier
+                .fillMaxWidth(widthPercent.coerceIn(ImageSizing.MIN_PERCENT, ImageSizing.DEFAULT_PERCENT) / 100f)
+                .heightIn(max = maxHeight)
+                .clip(RoundedCornerShape(12.dp))
+                .then(
+                    if (onClick != null || onLongClick != null) {
+                        Modifier.combinedClickable(onClick = { onClick?.invoke() }, onLongClick = onLongClick)
+                    } else Modifier
+                )
+        )
     }
 }
 

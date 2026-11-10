@@ -51,6 +51,8 @@
     <string name="reset_account">Konto zurücksetzen / trennen</string>
     <string name="image_add_failed">Bild konnte nicht hinzugefügt werden</string>
     <string name="image_alt">Bild</string>
+    <string name="image_size_title">Bildgröße</string>
+    <string name="image_size_fit">An Bildschirm angepasst</string>
     <string name="edited_at">Bearbeitet %1$s</string>
     <string name="cd_edit_mode">Bearbeitungsmodus</string>
     <string name="cd_read_mode">Lesemodus</string>
