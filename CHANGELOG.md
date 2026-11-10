@@ -11,6 +11,12 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 ### Corregido
 - Al reconectar una cuenta, las notas que ya estaban sincronizadas podían sobrescribirse con la versión del servidor o borrarse si allí había una lápida. Ahora se tratan como cambios locales: si difieren se conservan ambas versiones.
 - Una sincronización en segundo plano ya no puede colarse mientras se conecta una cuenta.
+- Cerrar una nota ya no deshace los cambios de carpeta, color o fijado hechos desde otro dispositivo o desde la lista (panel lateral en tablets y plegables) mientras estaba abierta.
+- Las imágenes recibidas por sincronización o importadas conservan su tipo real (PNG, JPEG, GIF, WebP) y se exportan con la extensión correcta.
+- Las fotos con orientación EXIF "transpuesta" o "transversa" ya no salen giradas.
+- Al aplicar una lista o numeración a varias líneas, las líneas vacías se respetan.
+- El texto compartido desde otras apps con saltos de línea de Windows se normaliza.
+- La sincronización en segundo plano deja de reintentar sin fin ante errores de la bóveda.
 
 ## [1.0.0] - 2026-11-08
 

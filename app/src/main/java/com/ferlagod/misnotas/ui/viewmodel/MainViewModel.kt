@@ -98,11 +98,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val noteWriteMutex = Mutex()
 
     /**
-     * Última versión (título, texto) de cada nota que conoce el editor. Si al guardar la base de
-     * datos tiene otra cosa, es que la sincronización trajo cambios de otro dispositivo mientras
-     * la nota estaba abierta: en vez de pisarlos se conservan como copia "(conflicto)".
+     * Última versión de cada nota que conoce el editor. Si al guardar la base de datos tiene otra
+     * cosa, es que cambió mientras la nota estaba abierta (sincronización, o acciones de la lista
+     * en el panel lateral de una pantalla ancha):
+     * - Texto: en vez de pisar lo recibido se conserva como copia "(conflicto)".
+     * - Carpeta, color y fijado: solo se aplican los que el usuario cambió en el editor.
      */
-    private val editorBases = java.util.concurrent.ConcurrentHashMap<String, Pair<String, String>>()
+    private data class EditorBase(
+        val title: String,
+        val content: String,
+        val folderId: String?,
+        val color: String,
+        val isPinned: Boolean
+    )
+
+    private val editorBases = java.util.concurrent.ConcurrentHashMap<String, EditorBase>()
 
     private val _events = Channel<UiEvent>(Channel.BUFFERED)
     val events: Flow<UiEvent> = _events.receiveAsFlow()
@@ -421,9 +431,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /** El editor ha cargado (o adoptado) esta versión de la nota. */
-    fun registerEditorBase(id: String, title: String, content: String) {
-        editorBases[id] = title to content
+    /** El editor ha cargado (o adoptado) esta versión de la nota y muestra estos datos. */
+    fun registerEditorBase(id: String, title: String, content: String, folderId: String?, color: NoteColor, isPinned: Boolean) {
+        editorBases[id] = EditorBase(title, content, folderId, color.key, isPinned)
     }
 
     private suspend fun saveNoteLocked(
@@ -452,8 +462,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         var cleanContent = content.trimEnd()
 
         val base = editorBases[id]
-        if (existing != null && base != null && (existing.title != base.first || existing.content != base.second)) {
-            if (cleanTitle == base.first.trim() && cleanContent == base.second.trimEnd()) {
+        // Carpeta, color y fijado: si el editor no los ha cambiado, se respeta lo que haya en la
+        // base de datos (quizá lo cambió otro dispositivo o la lista mientras la nota estaba abierta).
+        val finalFolderId = if (existing != null && base != null && folderId == base.folderId) existing.folderId else folderId
+        val finalColor = if (existing != null && base != null && color.key == base.color) existing.color else color.key
+        val finalPinned = if (existing != null && base != null && isPinned == base.isPinned) existing.isPinned else isPinned
+        val editorMeta = { t: String, c: String -> EditorBase(t, c, folderId, color.key, isPinned) }
+
+        if (existing != null && base != null && (existing.title != base.title || existing.content != base.content)) {
+            if (cleanTitle == base.title.trim() && cleanContent == base.content.trimEnd()) {
                 // El usuario no ha tocado el texto: gana la versión recibida (solo se aplican
                 // los cambios de color, carpeta o fijado que haya hecho en el editor).
                 cleanTitle = existing.title
@@ -469,7 +486,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 )
             }
-            editorBases[id] = cleanTitle to cleanContent
+            editorBases[id] = editorMeta(cleanTitle, cleanContent)
         }
 
         if (cleanTitle.isEmpty() && cleanContent.isBlank()) {
@@ -490,22 +507,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (existing != null &&
             existing.title == cleanTitle &&
             existing.content == cleanContent &&
-            existing.folderId == folderId &&
-            existing.color == color.key &&
-            existing.isPinned == isPinned
-        ) return
+            existing.folderId == finalFolderId &&
+            existing.color == finalColor &&
+            existing.isPinned == finalPinned
+        ) {
+            if (base != null) editorBases[id] = editorMeta(base.title, base.content)
+            return
+        }
 
         val entity = (existing ?: NoteEntity(id = id, title = "", content = "")).copy(
-            folderId = folderId,
+            folderId = finalFolderId,
             title = cleanTitle,
             content = cleanContent,
-            isPinned = isPinned,
-            color = color.key,
+            isPinned = finalPinned,
+            color = finalColor,
             updatedAt = System.currentTimeMillis(),
             syncStatus = if (existing?.syncStatus == SyncStatus.PENDING_DELETE) SyncStatus.PENDING_DELETE else SyncStatus.PENDING_UPLOAD
         )
         noteDao.upsertNote(entity)
-        editorBases[id] = cleanTitle to cleanContent
+        editorBases[id] = editorMeta(cleanTitle, cleanContent)
     }
 
     /** Borrado definitivo (con lápida en el servidor si hay cuenta). Requiere el cerrojo de escritura. */
@@ -538,7 +558,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     null
                 }
             }
-            val body = listOfNotNull(sharedText?.trim()?.takeIf { it.isNotEmpty() }, images.joinToString("\n").ifEmpty { null })
+            // Algunas apps comparten texto con saltos de línea de Windows ("\r\n"): el editor y las
+            // listas de tareas trabajan con "\n".
+            val cleanText = sharedText?.replace("\r\n", "\n")?.replace('\r', '\n')?.trim()
+            val body = listOfNotNull(cleanText?.takeIf { it.isNotEmpty() }, images.joinToString("\n").ifEmpty { null })
                 .joinToString("\n\n")
             if (body.isBlank() && subject.isNullOrBlank()) {
                 if (imageUris.isNotEmpty()) _events.trySend(UiEvent.Message(text(R.string.image_add_failed)))

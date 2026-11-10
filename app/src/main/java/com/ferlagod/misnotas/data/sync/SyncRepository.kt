@@ -456,7 +456,9 @@ class SyncRepository private constructor(context: Context) {
             if (name !in remote) continue
             val bytes = downloadRecord(name) { RemoteCodec.decryptAttachment(client.download(name), id, key) } ?: continue
             attachmentStore.write(id, bytes)
-            attachmentDao.upsert(AttachmentEntity(id = id, mimeType = "image/webp", size = bytes.size.toLong(), isUploaded = true))
+            attachmentDao.upsert(
+                AttachmentEntity(id = id, mimeType = AttachmentStore.detectMimeType(bytes), size = bytes.size.toLong(), isUploaded = true)
+            )
         }
     }
 

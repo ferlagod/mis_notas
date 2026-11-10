@@ -252,12 +252,14 @@ class BackupManager(context: Context) {
     private suspend fun storeAttachment(bytes: ByteArray, path: String): String {
         val id = UUID.randomUUID().toString()
         attachmentStore.write(id, bytes)
-        val mime = when (path.substringAfterLast('.').lowercase()) {
+        val byExtension = when (path.substringAfterLast('.').lowercase()) {
             "png" -> "image/png"
             "jpg", "jpeg" -> "image/jpeg"
             "gif" -> "image/gif"
             else -> "image/webp"
         }
+        // Manda el contenido: un .png que en realidad es JPEG se exporta luego como .jpg.
+        val mime = AttachmentStore.detectMimeType(bytes, fallback = byExtension)
         attachmentDao.upsert(AttachmentEntity(id = id, mimeType = mime, size = bytes.size.toLong()))
         return id
     }

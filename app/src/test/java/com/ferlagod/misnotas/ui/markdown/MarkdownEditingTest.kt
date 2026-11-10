@@ -100,4 +100,18 @@ class MarkdownEditingTest {
         assertEquals(1 to 3, taskProgress("- [x] a\n- [ ] b\n  * [ ] c\ntexto"))
         assertEquals(0 to 0, taskProgress("sin tareas"))
     }
+
+    @Test
+    fun multiLinePrefixSkipsBlankLines() {
+        val numbered = toggleLinePrefix("a\n\nb", 0, 4, LinePrefix.NUMBERED)
+        assertEquals("1. a\n\n2. b", numbered.text)
+        // Las líneas vacías no impiden reconocer que todas tienen ya el formato (alternar).
+        assertEquals("a\n\nb", toggleLinePrefix(numbered.text, 0, numbered.text.length, LinePrefix.NUMBERED).text)
+        assertEquals("- a\n\n- b", toggleLinePrefix("a\n\nb", 0, 4, LinePrefix.BULLET).text)
+    }
+
+    @Test
+    fun singleBlankLineStillGetsPrefix() {
+        assertEquals("- ", toggleLinePrefix("", 0, 0, LinePrefix.BULLET).text)
+    }
 }

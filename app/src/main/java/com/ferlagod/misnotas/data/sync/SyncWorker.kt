@@ -24,8 +24,9 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
     override suspend fun doWork(): Result {
         val result = SyncRepository.getInstance(applicationContext).synchronize()
         val error = result.exceptionOrNull() ?: return Result.success()
-        // Errores que no se arreglan reintentando: credenciales o contraseña.
-        return if (error is WebDavAuthException || error is WrongMasterPasswordException) {
+        // Errores que no se arreglan reintentando: credenciales, contraseña o bóveda. La próxima
+        // ejecución periódica (o abrir la app) lo vuelve a intentar.
+        return if (error is WebDavAuthException || error is WrongMasterPasswordException || error is VaultException) {
             Result.failure()
         } else {
             Result.retry()

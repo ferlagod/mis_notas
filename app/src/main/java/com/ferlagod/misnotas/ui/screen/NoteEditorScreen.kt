@@ -245,7 +245,8 @@ fun NoteEditorScreen(
     /** Versión en vivo de la nota (cambia si la sincronización trae cambios de otro dispositivo). */
     liveNote: NoteEntity? = null,
     /** Avisa de la versión de la nota que tiene el editor, para detectar cambios simultáneos. */
-    onBaseLoaded: (id: String, title: String, content: String) -> Unit = { _, _, _ -> },
+    onBaseLoaded: (id: String, title: String, content: String, folderId: String?, color: NoteColor, isPinned: Boolean) -> Unit =
+        { _, _, _, _, _, _ -> },
     /** Nota recién creada (con id ya asignado o sin él): el cursor va directo al texto. */
     isNewNote: Boolean = noteId == null
 ) {
@@ -316,7 +317,7 @@ fun NoteEditorScreen(
             textValue = TextFieldValue(existingNote.content)
             baseTitle = existingNote.title
             baseContent = existingNote.content
-            onBaseLoaded(stableId, existingNote.title, existingNote.content)
+            onBaseLoaded(stableId, existingNote.title, existingNote.content, selectedFolderId, selectedColor, isPinned)
             loaded = true
         } else if (noteLoaded) {
             loaded = true
@@ -332,7 +333,9 @@ fun NoteEditorScreen(
         if (title.trim() != baseTitle.trim() || textValue.text.trimEnd() != baseContent.trimEnd()) return@LaunchedEffect
         baseTitle = note.title
         baseContent = note.content
-        onBaseLoaded(stableId, note.title, note.content)
+        // Carpeta, color y fijado no se adoptan aquí: al guardar, el ViewModel solo aplica los
+        // que el usuario cambie en el editor, así que los recibidos no se pisan.
+        onBaseLoaded(stableId, note.title, note.content, selectedFolderId, selectedColor, isPinned)
         title = note.title
         val refreshed = TextFieldValue(note.content, TextRange(textValue.selection.start.coerceAtMost(note.content.length)))
         history.record(textValue, refreshed, force = true)

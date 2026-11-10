@@ -54,6 +54,22 @@ class AttachmentStore(context: Context) {
         fun fileFor(context: Context, id: String): File =
             File(File(context.applicationContext.filesDir, DIR_NAME), sanitize(id))
 
+        /**
+         * Tipo de imagen según sus primeros bytes (PNG, JPEG, GIF o WebP); [fallback] si no se
+         * reconoce. Sirve para los adjuntos que llegan del servidor, que no llevan su tipo.
+         */
+        fun detectMimeType(bytes: ByteArray, fallback: String = "image/webp"): String {
+            fun startsWith(vararg sig: Int, offset: Int = 0) =
+                bytes.size >= offset + sig.size && sig.indices.all { bytes[offset + it] == sig[it].toByte() }
+            return when {
+                startsWith(0x89, 0x50, 0x4E, 0x47) -> "image/png"
+                startsWith(0xFF, 0xD8, 0xFF) -> "image/jpeg"
+                startsWith(0x47, 0x49, 0x46, 0x38) -> "image/gif"
+                startsWith(0x52, 0x49, 0x46, 0x46) && startsWith(0x57, 0x45, 0x42, 0x50, offset = 8) -> "image/webp"
+                else -> fallback
+            }
+        }
+
         private fun sanitize(id: String): String = id.replace(Regex("[^A-Za-z0-9_-]"), "_")
     }
 }

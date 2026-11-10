@@ -41,10 +41,13 @@ fun toggleLinePrefix(text: String, selStart: Int, selEnd: Int, prefix: LinePrefi
     val lastLineEnd = text.indexOf('\n', end).let { if (it == -1) text.length else it }
 
     val lines = text.substring(firstLineStart, lastLineEnd).split('\n')
-    val allHave = lines.all { line -> lineHasPrefix(line, prefix) }
+    // Con varias líneas seleccionadas, las vacías separan bloques: no reciben marcador ni cuentan.
+    fun skip(line: String) = lines.size > 1 && line.isBlank()
+    val allHave = lines.filterNot(::skip).let { it.isNotEmpty() && it.all { line -> lineHasPrefix(line, prefix) } }
 
     var number = 1
     val newLines = lines.map { line ->
+        if (skip(line)) return@map line
         val match = ANY_PREFIX.find(line)
         val indent = match?.groupValues?.get(1) ?: line.takeWhile { it == ' ' || it == '\t' }
         val body = if (match != null) line.substring(match.range.last + 1) else line.substring(indent.length)
